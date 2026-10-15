@@ -1,0 +1,6 @@
+{
+  "name": "AdaptaEdu Escolar",
+  "description": "Sistema de gestão pedagógica e geração de atividades adaptadas para inclusão escolar na educação básica.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

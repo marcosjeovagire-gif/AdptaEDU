@@ -1,0 +1,6 @@
+{
+  "summary": "Plano de implementação para inclusão do parâmetro 'formatoLetra' ('bastao' ou 'cursiva') no serviço de geração de atividades e PEI (peiService.ts), com detecção automática baseada no laudo do estudante e opções de override manual, garantindo tipografia legível (Lexend) e caixa alta quando houver necessidade pedagógica.",
+  "updatedAt": "2026-10-15T12:56:31.898872111Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

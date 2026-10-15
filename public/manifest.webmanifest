@@ -1,0 +1,22 @@
+{
+  "name": "AdaptaEdu Escolar",
+  "short_name": "AdaptaEdu",
+  "description": "Sistema de gestão pedagógica e geração de atividades adaptadas para inclusão escolar na educação básica (Colégio Estadual Olynto Pereira de Castro - SEDUC/GO).",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f766e",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "/branding/logo-escola-2026.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/branding/logo-escola-2026.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
