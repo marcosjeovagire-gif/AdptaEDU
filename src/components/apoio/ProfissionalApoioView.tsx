@@ -53,6 +53,7 @@ import {
   AtividadeAdaptada
 } from '../../types';
 import { baixarRelatorioConsolidadoEstudantePdf } from '../../services/relatorioConsolidadoService';
+import { exportarHistoricoIntervencoesApoioPDF } from '../../services/relatorioIntervencoesApoioPdfService';
 import { obterTodosPeis } from '../../services/peiService';
 import { 
   isDiaUtil, 
@@ -108,6 +109,38 @@ export const ProfissionalApoioView: React.FC<ProfissionalApoioViewProps> = ({
   const [filtroTurma, setFiltroTurma] = useState<string>('todas');
   const [baixandoConsolidado, setBaixandoConsolidado] = useState<boolean>(false);
   const [notificacaoConsolidado, setNotificacaoConsolidado] = useState<string | null>(null);
+
+  // Estado para exportação do Histórico de Intervenções Pedagógicas em PDF (A4 - Margens 10mm)
+  const [exportandoIntervencoesPdf, setExportandoIntervencoesPdf] = useState<boolean>(false);
+  const [notificacaoIntervencoes, setNotificacaoIntervencoes] = useState<string | null>(null);
+
+  const handleExportarHistoricoIntervencoesPdf = async (aluno: Estudante) => {
+    try {
+      setExportandoIntervencoesPdf(true);
+      const res = await exportarHistoricoIntervencoesApoioPDF({
+        aluno,
+        registros: registrosApoio,
+        escolaConfig,
+        currentUser,
+        profissionalSelecionado: currentUser ? {
+          id: currentUser.id,
+          name: currentUser.name,
+          email: currentUser.email,
+        } : null,
+        periodoRotulo: 'Ciclo Letivo Vigente (2026)',
+      });
+      if (res.sucesso) {
+        setNotificacaoIntervencoes(`Histórico de Intervenções (${res.nomeArquivo}) exportado com sucesso em PDF (A4 • Margens 10mm)!${res.driveEnviado ? ' Cópia arquivada no Google Drive.' : ''}`);
+        setTimeout(() => setNotificacaoIntervencoes(null), 4500);
+      }
+    } catch (err: any) {
+      console.error('Erro ao exportar histórico de intervenções em PDF:', err);
+      setNotificacaoIntervencoes(`Falha ao exportar PDF: ${err.message || 'Erro inesperado'}`);
+      setTimeout(() => setNotificacaoIntervencoes(null), 4000);
+    } finally {
+      setExportandoIntervencoesPdf(false);
+    }
+  };
 
   const handleBaixarRelatorioConsolidado = async (aluno: Estudante) => {
     try {
@@ -904,16 +937,58 @@ export const ProfissionalApoioView: React.FC<ProfissionalApoioViewProps> = ({
                 <Clock className="h-4 w-4 text-emerald-700" />
                 <span>Histórico de Registros deste Estudante</span>
               </h3>
-              <button
-                type="button"
-                onClick={() => handleAbrirRelatorioAluno(alunoSelecionado)}
-                className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
-                title={`Exportar listagem e relatório de acompanhamento de ${alunoSelecionado.nome} em PDF`}
-              >
-                <Printer className="h-3.5 w-3.5" />
-                <span>Exportar Relatório em PDF</span>
-              </button>
+              
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Botão Oficial: Exportação de Intervenções em PDF (jsPDF • A4 • Margens 10mm) */}
+                <button
+                  type="button"
+                  onClick={() => handleExportarHistoricoIntervencoesPdf(alunoSelecionado)}
+                  disabled={exportandoIntervencoesPdf}
+                  className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+                  title={`Exportar documento PDF A4 com margens de 10mm contendo o histórico consolidado de intervenções pedagógicas de ${alunoSelecionado.nome}`}
+                >
+                  {exportandoIntervencoesPdf ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Gerando PDF A4...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileDown className="h-3.5 w-3.5 text-emerald-200" />
+                      <span>Exportar Intervenções (PDF A4 10mm)</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleAbrirRelatorioAluno(alunoSelecionado)}
+                  className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                  title={`Exportar listagem e relatório mensal de acompanhamento de ${alunoSelecionado.nome} em PDF`}
+                >
+                  <Printer className="h-3.5 w-3.5 text-slate-500" />
+                  <span>Relatório Mensal</span>
+                </button>
+              </div>
             </div>
+
+            {/* Feedback Visual da Exportação do PDF de Intervenções */}
+            {notificacaoIntervencoes && (
+              <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs font-bold text-emerald-950 flex items-center justify-between shadow-2xs animate-fadeIn">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-700 shrink-0" />
+                  <span>{notificacaoIntervencoes}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNotificacaoIntervencoes(null)}
+                  className="p-1 text-emerald-800 hover:bg-emerald-100 rounded-lg cursor-pointer"
+                  title="Fechar aviso"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
 
             {registrosApoio.filter(r => r.studentId === alunoSelecionado.id).length === 0 ? (
               <p className="text-xs text-slate-400 py-3 text-center">
@@ -1150,11 +1225,22 @@ export const ProfissionalApoioView: React.FC<ProfissionalApoioViewProps> = ({
                             <CalendarCheck className="h-4 w-4 text-emerald-700" />
                           </button>
 
+                          {/* Botão de Exportação de Intervenções em PDF (A4 10mm) */}
+                          <button
+                            type="button"
+                            onClick={() => handleExportarHistoricoIntervencoesPdf(est)}
+                            disabled={exportandoIntervencoesPdf}
+                            className="py-2 px-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                            title={`Exportar Histórico Consolidado de Intervenções Pedagógicas em PDF (A4 • Margens 10mm) de ${est.nome}`}
+                          >
+                            <FileDown className="h-4 w-4 text-emerald-700" />
+                          </button>
+
                           <button
                             type="button"
                             onClick={() => handleAbrirRelatorioAluno(est)}
                             className="py-2 px-2.5 bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-800 rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0"
-                            title={`Gerar Relatório em PDF de ${est.nome} para a Direção`}
+                            title={`Gerar Relatório Mensal em PDF de ${est.nome} para a Direção`}
                           >
                             <Printer className="h-4 w-4" />
                           </button>
@@ -1409,6 +1495,41 @@ export const ProfissionalApoioView: React.FC<ProfissionalApoioViewProps> = ({
                         className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                       >
                         Ver Todo o Mês ({registrosDoMes.length})
+                      </button>
+                    )}
+
+                    {filtroEstudanteCronologico !== 'todos' ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const est = estudantes.find(e => e.id === filtroEstudanteCronologico);
+                          if (est) handleExportarHistoricoIntervencoesPdf(est);
+                        }}
+                        disabled={exportandoIntervencoesPdf}
+                        className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                        title="Exportar Histórico Consolidado de Intervenções Pedagógicas em PDF (A4 • Margens 10mm) do aluno filtrado"
+                      >
+                        {exportandoIntervencoesPdf ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <span>Gerando PDF A4...</span>
+                          </>
+                        ) : (
+                          <>
+                            <FileDown className="h-3.5 w-3.5 text-emerald-200" />
+                            <span>Exportar Intervenções (PDF A4 10mm)</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleAbrirRelatorioGeral}
+                        className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Exportar Relatório Mensal Geral da Escola em PDF"
+                      >
+                        <Printer className="h-3.5 w-3.5 text-emerald-700" />
+                        <span>Relatório Geral (PDF)</span>
                       </button>
                     )}
 

@@ -18,6 +18,7 @@ import {
   requestPasswordlessEmailLink 
 } from '../server/authService';
 import { signInWithGoogleDrive } from '../services/googleDriveService';
+import { sincronizarUsuarioAutorizadoNoFirestore } from '../services/escolaFirestoreService';
 import { InstitutionalLogo } from './common/InstitutionalLogo';
 import LogoOlynto, { LogoOlynto as LogoOlyntoComponent } from './common/LogoOlynto';
 
@@ -50,15 +51,30 @@ export const LoginView: React.FC<LoginViewProps> = ({
   // Submissão do Acesso (Modo Local ou Envio de Link em Produção)
   const handleSubmitAcesso = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isProcessando) return;
+
     setMensagemErro(null);
     setMensagemSucesso(null);
     setMostrarBotaoIrParaProfessor(false);
+
+    // Validação estrita de formato de e-mail e normalização
+    const emailLimpo = emailInput.trim().toLowerCase();
+    if (!emailLimpo) {
+      setMensagemErro('Por favor, informe seu e-mail educacional cadastrado.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailLimpo)) {
+      setMensagemErro('Por favor, informe um endereço de e-mail válido (exemplo: nome@educa.go.gov.br).');
+      return;
+    }
 
     // FLUXO DO MODO LOCAL DE PRÉ-VISUALIZAÇÃO (Firebase ainda não conectado)
     if (!isFirebaseConfigured) {
       setIsProcessando(true);
       const res = verifyLocalPreviewAccess({
-        email: emailInput,
+        email: emailLimpo,
         espacoDesejado,
         authorizedUsers: usuariosAutorizados,
       });
@@ -85,14 +101,18 @@ export const LoginView: React.FC<LoginViewProps> = ({
     // FLUXO PREPARADO PARA PRODUÇÃO (Firebase Authentication Email Link)
     setIsProcessando(true);
     const res = requestPasswordlessEmailLink({
-      email: emailInput,
+      email: emailLimpo,
       espacoDesejado,
       authorizedUsers: usuariosAutorizados,
     });
     setIsProcessando(false);
 
     if (!res.success) {
-      setMensagemErro(res.message);
+      // Mensagem amigável sem expor códigos técnicos internos
+      const msgAmigavel = res.message.includes('auth/') 
+        ? 'Não foi possível validar o acesso com este e-mail. Verifique se o e-mail está autorizado pela Coordenação.'
+        : res.message;
+      setMensagemErro(msgAmigavel);
       return;
     }
 
@@ -155,6 +175,9 @@ export const LoginView: React.FC<LoginViewProps> = ({
       }
 
       if (userEncontrado) {
+        // Sincroniza o usuário autorizado no Firestore com seu Firebase UID
+        sincronizarUsuarioAutorizadoNoFirestore(userEncontrado, gUser).catch(() => {});
+
         setMensagemSucesso(`Autenticado com sucesso via Google (${gEmail})! Conectando ao Google Drive...`);
         const targetRoute = espacoDesejado === 'coordinator' 
           ? '/coordinator-preview' 
@@ -229,7 +252,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
       </div>
 
       {/* Caixa Central de Acesso */}
-      <div className="max-w-md mx-auto w-full my-auto py-6">
+      <div className="w-[94%] max-w-[500px] mx-auto my-auto py-6">
         <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-xl space-y-6">
           
           {/* Formulário de Acesso com Logo Oficial Centralizado no Topo */}

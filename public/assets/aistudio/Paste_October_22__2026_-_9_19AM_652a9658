@@ -1,0 +1,1171 @@
+ACT AS AN AUTONOMOUS SENIOR FULL-STACK SOFTWARE ENGINEER, SENIOR DEVOPS ENGINEER, CLOUD RUNTIME ENGINEER, VITE BUILD SPECIALIST, NODE.JS BACKEND ENGINEER, WEBSOCKET SPECIALIST, AND SOFTWARE ARCHITECT.
+
+Your task is to autonomously diagnose and correct the runtime connection problem in the existing application:
+
+“AdaptaEdu Escolar”
+Colégio Estadual Olynto Pereira de Castro
+SEDUC-GO
+
+The application currently uses or appears to use:
+
+• Vite 8.3.5;
+• React and TypeScript;
+• Node.js;
+• Express or an equivalent server in server.ts;
+• esbuild for the server bundle;
+• Google AI Studio development preview;
+• a Google Cloud Run reverse proxy;
+• HTTPS on the public browser URL;
+• localhost:3000 inside the development container;
+• Vite Hot Module Replacement;
+• WebSocket connections;
+• Firebase and Cloud Firestore;
+• compressed production assets.
+
+IMPORTANT LANGUAGE REQUIREMENT:
+
+This engineering prompt is written in United States English. However, the application interface, buttons, menus, forms, educational activities, reports, notifications, validation messages, PDFs, print documents, and all other user-facing content must remain in Brazilian Portuguese.
+
+Do not translate the application interface into English.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. OBSERVED EXECUTION RESULTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The following build command was executed:
+
+vite build && esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=server.js
+
+The client build completed successfully:
+
+• Vite version: 8.3.5;
+• Client production build time: approximately 2.55 seconds;
+• dist/index.html was created;
+• CSS and JavaScript chunks were generated;
+• gzip compression completed;
+• server.js was generated;
+• server.js size was approximately 84.0 kB;
+• esbuild completed successfully;
+• the final build message was “Build successful.”
+
+Therefore, do not incorrectly treat this as a compilation failure.
+
+The relevant runtime error occurs after the successful build:
+
+[vite] failed to connect to websocket.
+
+The environment reported:
+
+Browser HTTP origin:
+ais-dev-dhwgsxzsrob7nkmenivoxz-633902362611.us-east1.run.app
+
+Internal server:
+localhost:3000
+
+Observed HTTP route:
+
+browser public HTTPS domain
+<-- HTTP -->
+localhost:3000 inside the container
+
+Failing WebSocket route:
+
+browser public HTTPS domain
+<-- WebSocket failing -->
+localhost:3000 inside the container
+
+This strongly indicates that the HTTP reverse proxy is forwarding normal requests, but the Vite development client is attempting to establish its HMR WebSocket connection using the wrong host, protocol, port, path, origin, or proxy assumptions.
+
+The repeated backend message “CONNECTED” is not, by itself, proof that Vite HMR is connected.
+
+Distinguish among:
+
+• backend process connectivity;
+• browser HTTP connectivity;
+• application API connectivity;
+• Firestore connectivity;
+• Vite HMR WebSocket connectivity.
+
+Do not modify Firestore, Firebase Authentication, Google Drive, curriculum processing, student records, activities, PEI records, or pedagogical modules to solve this issue unless direct evidence proves that one of those modules causes the WebSocket problem.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. PRIMARY OBJECTIVE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Correct the Vite development-runtime WebSocket configuration so that:
+
+1. the browser can load the application through the public Google AI Studio or Cloud Run HTTPS preview URL;
+2. the Vite HMR client uses the correct public host;
+3. the WebSocket uses WSS when the page uses HTTPS;
+4. the public WebSocket client port is compatible with the reverse proxy, normally 443 for HTTPS/WSS unless the runtime provides another explicit port;
+5. the internal Vite server continues listening on the correct container port;
+6. local development on localhost continues to work;
+7. optional school LAN development continues to work when intentionally enabled;
+8. production builds remain unaffected;
+9. production deployment does not include or depend on Vite HMR;
+10. no existing application feature is removed or damaged.
+
+Do not merely hide the console error.
+
+Do not set hmr.overlay to false as the only solution.
+
+Do not suppress the Vite client log.
+
+Do not remove the Vite client script to conceal the problem.
+
+Do not disable all WebSocket support without first determining whether the current environment requires HMR.
+
+Fix the root cause.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. PRESERVATION REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Preserve all existing:
+
+• source files;
+• routes;
+• components;
+• views;
+• users;
+• registered professionals;
+• students;
+• pedagogical profiles;
+• curriculum matrices;
+• activities;
+• Support Professional reports;
+• PEI documents;
+• A4 generation;
+• PDF generation;
+• Google Drive integration;
+• Firebase configuration;
+• Firestore collections;
+• Firestore rules;
+• official school logos;
+• SEDUC-GO logos;
+• Brazilian Portuguese interface content;
+• environment variable names;
+• application base path;
+• production asset paths;
+• compression behavior;
+• backend endpoints.
+
+Do not recreate the application from scratch.
+
+Do not downgrade Vite merely to avoid understanding the Vite 8 configuration.
+
+Do not upgrade unrelated dependencies.
+
+Do not replace real functionality with mocks or placeholders.
+
+Do not erase data.
+
+Do not change working configurations unless the change is necessary to solve the verified runtime issue.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. CREATE A CHECKPOINT BEFORE CHANGES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before changing any file:
+
+1. inspect the complete project;
+2. inspect package.json;
+3. inspect the lockfile;
+4. inspect vite.config.ts or vite.config.js;
+5. inspect server.ts;
+6. inspect all environment files and documented environment-variable names;
+7. inspect the Google AI Studio runtime configuration available to the project;
+8. inspect the application base path;
+9. inspect package scripts;
+10. inspect proxy configuration;
+11. inspect current Vite plugins;
+12. inspect whether the project uses middleware mode;
+13. inspect whether the project manually creates an HTTP or WebSocket server;
+14. inspect whether server.ts serves dist in production;
+15. inspect whether the preview environment runs the Vite development server or server.js;
+16. create a checkpoint or backup of the files that will be changed.
+
+Never include secrets in the checkpoint report.
+
+Record the original contents or relevant configuration of:
+
+• package.json;
+• vite.config.ts;
+• server.ts;
+• .env variable names, without secret values;
+• any runtime or deployment configuration file that affects host, port, proxy, HTTPS, HMR, or WebSocket behavior.
+
+Provide a rollback path.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. DETERMINE THE ACTUAL RUNTIME MODE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before applying a fix, determine which process is responsible for the failing preview.
+
+Possible modes include:
+
+MODE A:
+Vite development server runs directly on port 3000.
+
+MODE B:
+An Express server runs on port 3000 and mounts Vite in middleware mode.
+
+MODE C:
+Google AI Studio starts the Vite development server behind an HTTPS reverse proxy.
+
+MODE D:
+The production application runs through server.js, but an unnecessary Vite development client was included.
+
+MODE E:
+A custom proxy or server forwards HTTP but not WebSocket upgrade requests.
+
+MODE F:
+The application uses a non-root base path such as /app/applet/ and the HMR WebSocket path does not match the proxied route.
+
+Do not assume which mode is active.
+
+Identify the mode from:
+
+• package scripts;
+• process startup command;
+• server.ts;
+• Vite configuration;
+• runtime logs;
+• generated index.html;
+• loaded browser scripts;
+• environment variables;
+• public URL;
+• current base path.
+
+Document the detected mode before modifying the configuration.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. VITE 8 CONFIGURATION REQUIREMENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The project uses Vite 8.3.5.
+
+For Vite 8, inspect the currently supported server WebSocket configuration.
+
+Do not blindly rely on outdated examples that place all WebSocket properties inside server.hmr.
+
+The previous HMR WebSocket properties may be deprecated in Vite 8.
+
+Prefer the current Vite 8 configuration structure when supported by the installed version:
+
+• server.hmr for enabling HMR and controlling the overlay;
+• server.ws for WebSocket host, protocol, port, clientPort, path, timeout, or server association;
+• server.host for the server listening interface;
+• server.port for the internal development port;
+• server.strictPort to prevent silent port changes;
+• server.allowedHosts for explicitly authorized public hosts.
+
+Verify the exact TypeScript types provided by the installed Vite package before implementing these properties.
+
+Do not insert configuration that fails type checking.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. HOST AND INTERNAL PORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Configure the development server to listen on the container interface when required:
+
+host: '0.0.0.0'
+
+Use the runtime-provided port when available.
+
+The implementation must prioritize environment variables such as:
+
+• PORT;
+• VITE_DEV_PORT;
+• another existing project-specific port variable.
+
+Use port 3000 only as a safe development fallback if the current environment expects port 3000.
+
+Use behavior equivalent to:
+
+const internalPort = Number(
+  process.env.PORT ||
+  process.env.VITE_DEV_PORT ||
+  3000
+);
+
+Validate the port before using it.
+
+Configure strictPort when appropriate so Vite does not silently change to another port and leave the reverse proxy pointing to the wrong location.
+
+Do not change the production server port behavior unless necessary.
+
+The public browser port and the internal container port are not necessarily the same:
+
+• internal server may listen on port 3000;
+• public HTTPS and WSS normally use port 443.
+
+Do not force the browser to connect directly to the container’s localhost:3000.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. PUBLIC PREVIEW HOST DETECTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Do not hard-code the temporary Google AI Studio preview hostname as the only supported host.
+
+The currently observed hostname is:
+
+ais-dev-dhwgsxzsrob7nkmenivoxz-633902362611.us-east1.run.app
+
+Treat that value only as evidence of the current environment.
+
+Use an environment-driven configuration when possible, such as:
+
+• VITE_PUBLIC_HOST;
+• VITE_HMR_HOST;
+• VITE_PUBLIC_ORIGIN;
+• VITE_HMR_PROTOCOL;
+• VITE_HMR_CLIENT_PORT;
+• VITE_HMR_PATH.
+
+Before adding new variables, inspect whether the project or Google AI Studio environment already provides equivalent variables.
+
+Do not duplicate existing settings.
+
+The implementation must support these scenarios:
+
+1. Google AI Studio or Cloud Run HTTPS proxy;
+2. localhost development;
+3. school LAN development;
+4. production build.
+
+Use an explicit public host only when a public preview host exists.
+
+Do not set an empty string, malformed host, full URL where only a hostname is expected, or a hostname containing a path.
+
+Normalize values safely:
+
+• remove https:// or http:// when a hostname-only property is required;
+• remove trailing slash;
+• separate hostname from port;
+• preserve a WebSocket path separately;
+• validate client port;
+• choose wss for HTTPS;
+• choose ws for local HTTP.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9. WEBSOCKET AND HMR CONFIGURATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Implement an environment-aware WebSocket configuration.
+
+For a proxied public HTTPS preview, the intended behavior is equivalent to:
+
+• WebSocket protocol: wss;
+• WebSocket host: the browser-visible public hostname;
+• WebSocket client port: 443, unless the environment explicitly provides another external port;
+• internal Vite server port: the container port, generally 3000 in the observed environment;
+• WebSocket path: the correct proxied path expected by the runtime;
+• server listening host: 0.0.0.0.
+
+For local HTTP development, the intended behavior is equivalent to:
+
+• WebSocket protocol: ws;
+• host: localhost or the current browser host;
+• internal port: the local development port;
+• no forced public Cloud Run hostname.
+
+For school LAN HTTP development, the intended behavior is equivalent to:
+
+• server listening on 0.0.0.0;
+• WebSocket protocol: ws;
+• client uses the actual LAN hostname or IP;
+• no forced localhost hostname;
+• no forced Cloud Run hostname.
+
+Use conditional configuration, not one global hard-coded solution.
+
+A structurally compatible Vite 8 approach may resemble:
+
+import { defineConfig, loadEnv } from 'vite';
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const internalPort = Number(env.PORT || env.VITE_DEV_PORT || 3000);
+  const publicHost = normalizeHost(
+    env.VITE_HMR_HOST ||
+    env.VITE_PUBLIC_HOST ||
+    ''
+  );
+  const publicProtocol =
+    env.VITE_HMR_PROTOCOL ||
+    (publicHost ? 'wss' : 'ws');
+  const publicClientPort = Number(
+    env.VITE_HMR_CLIENT_PORT ||
+    (publicProtocol === 'wss' ? 443 : internalPort)
+  );
+
+  return {
+    server: {
+      host: '0.0.0.0',
+      port: internalPort,
+      strictPort: true,
+
+      hmr: true,
+
+      ...(publicHost
+        ? {
+            ws: {
+              protocol: publicProtocol,
+              host: publicHost,
+              clientPort: publicClientPort,
+            },
+          }
+        : {}),
+    },
+  };
+});
+
+This example is not a command to overwrite the existing configuration.
+
+It is an architectural reference only.
+
+You must merge the correction into the actual existing vite.config file while preserving:
+
+• plugins;
+• aliases;
+• base;
+• build options;
+• chunk configuration;
+• compression;
+• manualChunks;
+• proxy configuration;
+• environment definitions;
+• React plugin;
+• path aliases;
+• current output directories.
+
+If the installed Vite 8 types require a different exact shape, use the installed type definitions and official API.
+
+Do not create both conflicting server.hmr WebSocket settings and server.ws settings.
+
+Do not leave two sources of truth for the HMR address.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10. WEBSOCKET PATH AND APPLICATION BASE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The build output includes paths that appear to involve:
+
+dist//app/applet/assets/
+
+Investigate whether the application uses a configured base path such as:
+
+/app/applet/
+
+Check:
+
+• Vite base;
+• generated index.html asset URLs;
+• compression-plugin output paths;
+• Cloud Run proxy path;
+• Vite HMR path;
+• WebSocket upgrade route;
+• duplicate slash generation;
+• server static-file mount path.
+
+Determine whether the double slash in:
+
+dist//app/applet/assets/
+
+is only a harmless plugin display path or an actual path-construction defect.
+
+Do not modify the base path blindly.
+
+If the public application is served under /app/applet/, ensure:
+
+• asset paths remain correct;
+• navigation remains correct;
+• static files remain correct;
+• HMR WebSocket path is compatible with the proxy;
+• server fallback routing remains correct;
+• no duplicate slash is generated;
+• PDF and Google Drive routes remain unaffected.
+
+If the WebSocket proxy requires a specific path, configure the same path consistently in:
+
+• Vite server WebSocket settings;
+• client WebSocket settings;
+• reverse proxy, when editable;
+• Express or custom server upgrade handling, when applicable.
+
+Do not invent a path without checking the runtime.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+11. ALLOWED HOSTS AND SECURITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Do not solve the host problem using:
+
+allowedHosts: true
+
+unless the environment makes an explicit allowlist technically impossible and the security consequences are documented.
+
+Prefer an explicit allowlist.
+
+Allow only trusted hosts, such as:
+
+• localhost;
+• 127.0.0.1;
+• the actual Google AI Studio or Cloud Run preview host;
+• an explicitly configured school LAN host when necessary.
+
+Do not add broad entries such as:
+
+• .com;
+• .run.app without necessity;
+• every possible public host;
+• arbitrary user-controlled domains.
+
+If the public preview hostname is dynamic, use the supported environment mechanism for adding the exact host.
+
+Do not disable origin protection broadly.
+
+Do not use insecure CORS configuration such as:
+
+cors: true
+
+unless there is a verified requirement and a restricted alternative is impossible.
+
+Do not use rewriteWsOrigin without evaluating the security implications.
+
+Do not expose project source files to arbitrary hosts.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+12. REVERSE PROXY AND WEBSOCKET UPGRADE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Verify whether the Google AI Studio or Cloud Run proxy forwards WebSocket upgrade requests.
+
+Inspect whether the application-controlled server receives:
+
+• Connection: Upgrade;
+• Upgrade: websocket;
+• Sec-WebSocket-Key;
+• Sec-WebSocket-Version;
+• Origin;
+• Host;
+• X-Forwarded-Host;
+• X-Forwarded-Proto;
+• X-Forwarded-Port.
+
+Do not log authentication tokens, cookies, student data, or complete sensitive headers.
+
+If Express or a custom Node.js server owns the HTTP server, verify whether Vite’s WebSocket server is attached to the same server instance.
+
+If Vite is running in middleware mode, configure the WebSocket server against the same HTTP server when required by the installed Vite 8 API.
+
+Do not start two unrelated HTTP servers on the same port.
+
+Do not create a second WebSocket server if Vite already owns the required WebSocket route.
+
+If a custom reverse proxy exists in server.ts, confirm that WebSocket upgrade events are forwarded.
+
+If the Google-managed external proxy cannot be modified, configure the Vite client to connect through the proxy-supported public WSS origin and path.
+
+If the managed preview environment does not support HMR WebSockets at all, implement a safe environment-specific fallback described in the next section.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+13. CONTROLLED FALLBACK WHEN HMR IS UNSUPPORTED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Only after verifying that the managed preview environment cannot support the Vite HMR WebSocket, apply an environment-specific fallback.
+
+The fallback must:
+
+• affect only that specific managed preview mode;
+• keep normal localhost HMR enabled;
+• keep LAN development HMR enabled when supported;
+• keep production free of the HMR client;
+• preserve application functionality;
+• avoid repeated WebSocket reconnection noise.
+
+Do not globally disable HMR for all environments.
+
+Do not use hmr.overlay: false as a substitute for disabling an unsupported connection.
+
+If Vite 8 supports an environment-specific WebSocket disable option, use the correct installed API only for the unsupported managed preview mode.
+
+Document clearly:
+
+• why HMR cannot operate;
+• which environment variable activates the fallback;
+• which environments retain HMR;
+• how developers receive updated code in fallback mode;
+• whether a full page refresh or preview restart is required.
+
+The preferred result is a working WSS connection.
+
+The controlled fallback is acceptable only if the external managed proxy genuinely blocks HMR WebSockets.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+14. DEVELOPMENT AND PRODUCTION SEPARATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ensure that HMR configuration applies only to development.
+
+The production command currently builds:
+
+• the Vite client into dist;
+• server.ts into server.js.
+
+Verify that production server.js:
+
+• serves the compiled dist files;
+• does not start a Vite development server;
+• does not inject /@vite/client;
+• does not require an HMR WebSocket;
+• uses the runtime-provided PORT;
+• binds to 0.0.0.0 when required by the hosting platform;
+• handles SPA fallback routing correctly;
+• preserves API endpoints;
+• shuts down gracefully.
+
+Inspect the generated dist/index.html.
+
+The production dist/index.html must not contain:
+
+• /@vite/client;
+• development-only HMR scripts;
+• localhost HMR references;
+• hard-coded temporary preview domains.
+
+If production includes the Vite client, identify and fix the source of the incorrect injection.
+
+Do not disable production compression.
+
+Do not change the current code-splitting configuration merely because some chunks are large.
+
+The bundle-size entries shown in the log are not build failures.
+
+Treat bundle optimization as a separate improvement unless a chunk causes an actual runtime failure.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+15. SERVER.TS REQUIREMENTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Inspect server.ts before changing it.
+
+Preserve:
+
+• current API routes;
+• static-file serving;
+• Firebase integration;
+• authentication middleware;
+• Google Drive endpoints;
+• PDF endpoints;
+• health checks;
+• SPA fallback;
+• error handling.
+
+Verify that server.ts reads the hosting platform port using behavior equivalent to:
+
+const port = Number(process.env.PORT || 3000);
+
+Verify that the server listens with behavior equivalent to:
+
+server.listen(port, '0.0.0.0');
+
+Do not modify this if an existing correct implementation is already present.
+
+If Vite middleware is used during development:
+
+• instantiate Vite only in development;
+• use middlewareMode correctly;
+• attach WebSocket handling to the owning HTTP server if required;
+• do not serve Vite middleware in production;
+• close Vite cleanly on shutdown.
+
+If server.ts is only the production server, do not add Vite development WebSocket logic to the production bundle.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+16. ENVIRONMENT VARIABLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Reuse existing environment variables when possible.
+
+If new variables are required, prefer clearly documented variables such as:
+
+VITE_HMR_HOST
+VITE_HMR_PROTOCOL
+VITE_HMR_CLIENT_PORT
+VITE_HMR_PATH
+VITE_PUBLIC_HOST
+VITE_PUBLIC_ORIGIN
+VITE_DEV_PORT
+DISABLE_HMR_IN_MANAGED_PREVIEW
+
+Do not add every variable if the project only needs one or two.
+
+Do not place secret values in VITE_* variables because Vite exposes VITE_* variables to the client bundle.
+
+Only public connection metadata may use VITE_* variables.
+
+Never put the following in client-exposed variables:
+
+• Firebase Admin private keys;
+• Google service-account private keys;
+• Gemini secret API keys;
+• OAuth client secrets;
+• refresh tokens;
+• session secrets.
+
+Update:
+
+• .env.example;
+• deployment documentation;
+• configuration comments;
+
+without including real secret values.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+17. AUTONOMOUS DIAGNOSTIC SEQUENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Execute the following sequence autonomously.
+
+STEP 1 — VERIFY THE CURRENT BUILD
+
+Run the project’s configured production build.
+
+Confirm that the existing successful build can be reproduced.
+
+Do not change code before preserving the baseline result.
+
+STEP 2 — INSPECT THE CURRENT VITE CONFIGURATION
+
+Identify:
+
+• host;
+• port;
+• strictPort;
+• hmr;
+• ws;
+• allowedHosts;
+• cors;
+• proxy;
+• base;
+• plugins;
+• compression;
+• output directory;
+• environment-variable handling.
+
+STEP 3 — IDENTIFY THE RUNTIME PROCESS
+
+Determine whether Google AI Studio runs:
+
+• Vite dev;
+• Vite preview;
+• Express;
+• server.js;
+• Vite middleware;
+• a custom command.
+
+STEP 4 — IDENTIFY THE CLIENT WEBSOCKET TARGET
+
+Inspect the browser-visible HMR connection target.
+
+Determine:
+
+• protocol;
+• hostname;
+• port;
+• path;
+• origin;
+• whether the client incorrectly resolves to localhost;
+• whether the proxy rewrites Host or forwarded headers.
+
+STEP 5 — INSPECT THE SERVER WEBSOCKET ROUTE
+
+Determine whether the server receives the upgrade request.
+
+Distinguish among:
+
+• DNS or host error;
+• TLS protocol mismatch;
+• wrong port;
+• wrong path;
+• proxy rejection;
+• origin rejection;
+• missing upgrade forwarding;
+• Vite server not attached;
+• HMR disabled;
+• managed-environment limitation.
+
+STEP 6 — APPLY THE SMALLEST SAFE FIX
+
+Modify only the required configuration or server logic.
+
+Do not refactor unrelated pedagogical modules.
+
+STEP 7 — RUN LOCAL TESTS
+
+Verify localhost development and HMR.
+
+STEP 8 — RUN PROXIED-PREVIEW TESTS
+
+Verify the public HTTPS preview and WSS connection.
+
+STEP 9 — RUN PRODUCTION TESTS
+
+Verify that the production build does not use HMR.
+
+STEP 10 — RUN REGRESSION TESTS
+
+Verify the application’s major existing modules.
+
+STEP 11 — REPORT THE RESULT
+
+Provide evidence and list the exact files changed.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+18. REQUIRED TESTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Execute and document all tests that the environment supports.
+
+BUILD TESTS
+
+1. Run the configured TypeScript check.
+2. Run the configured lint command, if present.
+3. Run the production build.
+4. Confirm that dist/index.html exists.
+5. Confirm that server.js exists.
+6. Confirm that no build error occurs.
+7. Confirm that compression still completes.
+8. Confirm that no production HTML contains /@vite/client.
+
+LOCAL DEVELOPMENT TESTS
+
+9. Start the development server.
+10. Confirm that it listens on the expected internal port.
+11. Confirm localhost page loading.
+12. Confirm the HMR WebSocket connects.
+13. Modify a harmless development-only text or style.
+14. Confirm HMR updates without a full page reload.
+15. Undo the temporary test change.
+16. Confirm there is no reconnect loop.
+
+PUBLIC PREVIEW TESTS
+
+17. Open the Google AI Studio or Cloud Run preview URL.
+18. Confirm the application loads over HTTPS.
+19. Confirm the HMR client uses WSS.
+20. Confirm the HMR client does not target localhost.
+21. Confirm the public client port is correct.
+22. Confirm the HMR path is correct.
+23. Confirm the WebSocket returns a successful switching-protocol response when supported.
+24. Confirm the console no longer displays “failed to connect to websocket.”
+25. Confirm the page remains connected for at least five minutes.
+26. Confirm a source change reaches the browser when HMR is supported.
+27. Confirm there is no aggressive refresh loop.
+28. Confirm there is no repeated WebSocket reconnection storm.
+
+PRODUCTION TESTS
+
+29. Start the compiled production server.
+30. Confirm static assets load.
+31. Confirm SPA navigation works after refresh.
+32. Confirm server.js uses the runtime port.
+33. Confirm production does not attempt an HMR connection.
+34. Confirm no localhost URL appears in browser requests.
+35. Confirm no temporary preview hostname is hard-coded in the production bundle.
+
+REGRESSION TESTS
+
+36. Open the login screen.
+37. Verify the Coordination profile screen loads.
+38. Verify the Teacher profile screen loads.
+39. Verify the Support Professional profile screen loads.
+40. Verify the Curriculum Matrix module loads.
+41. Verify the A4 editor loads.
+42. Verify PDF preview still loads.
+43. Verify Google Drive controls still render.
+44. Verify Firestore initialization still works.
+45. Verify no existing route is broken.
+46. Verify official logos remain unchanged.
+47. Verify all user-facing text remains in Brazilian Portuguese.
+
+SECURITY TESTS
+
+48. Confirm allowedHosts is not unnecessarily set to true.
+49. Confirm CORS is not unnecessarily open to every origin.
+50. Confirm no secret is exposed in the client bundle.
+51. Confirm no authentication token appears in logs.
+52. Confirm WebSocket origin handling is not weakened unnecessarily.
+53. Confirm no source map or source file is exposed beyond the existing deployment policy.
+
+Mark every test as one of:
+
+• PASSED;
+• FAILED;
+• NOT EXECUTED;
+• NOT APPLICABLE.
+
+Do not mark a test as PASSED unless it was actually executed.
+
+For every FAILED or NOT EXECUTED test, provide:
+
+• the reason;
+• the exact missing requirement;
+• the exact command or procedure to execute it;
+• the expected result.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+19. ACCEPTANCE CRITERIA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The correction is complete only when all applicable requirements are satisfied:
+
+• the production build remains successful;
+• the existing successful build behavior is preserved;
+• the browser no longer attempts to connect to localhost:3000 from the public preview;
+• the public HTTPS preview uses WSS when HMR is supported;
+• the public WebSocket client uses the correct external port;
+• the WebSocket path matches the proxy route;
+• localhost development still works;
+• HMR works locally;
+• LAN access remains possible when enabled;
+• production does not include the Vite HMR client;
+• no reconnect loop remains;
+• no critical browser-console error remains;
+• no unnecessary broad allowedHosts setting is introduced;
+• no unnecessary broad CORS setting is introduced;
+• no application data is lost;
+• no application feature is removed;
+• Firebase continues to work;
+• Google Drive continues to work;
+• A4 and PDF modules continue to load;
+• all existing roles continue to load;
+• the application interface remains in Brazilian Portuguese;
+• the fix is documented;
+• rollback instructions are provided.
+
+If the managed Google AI Studio preview genuinely does not support HMR WebSockets, acceptance requires:
+
+• the limitation is proven;
+• the fallback is restricted to that environment;
+• the reconnect error and retry loop are eliminated;
+• local HMR remains enabled;
+• LAN HMR remains enabled when supported;
+• production remains unaffected;
+• the preview remains fully usable through manual or controlled refresh.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+20. PROHIBITED SHORTCUTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Do not:
+
+• describe the successful build as failed;
+• rebuild the application from scratch;
+• remove server.ts;
+• delete the Vite configuration;
+• downgrade Vite without documented necessity;
+• upgrade unrelated dependencies;
+• set allowedHosts: true as the first solution;
+• set cors: true as the first solution;
+• disable browser security;
+• disable all HMR globally;
+• hide the error overlay as the only correction;
+• suppress console errors without fixing the cause;
+• hard-code the temporary preview hostname into production;
+• force localhost as the public WebSocket host;
+• force port 3000 as the public WSS port;
+• use ws on an HTTPS page;
+• create duplicate HMR and WebSocket configurations;
+• use deprecated Vite options without verifying compatibility;
+• create an unnecessary second synchronization backend;
+• change Firestore rules to solve a Vite WebSocket error;
+• modify student data;
+• modify curriculum content;
+• remove application modules;
+• claim that a test passed without executing it;
+• stop after presenting recommendations.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+21. REQUIRED FINAL ENGINEERING REPORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+After completing the correction, provide a final report with these exact sections:
+
+1. ROOT CAUSE
+
+State the verified technical cause of the WebSocket failure.
+
+2. RUNTIME MODE DETECTED
+
+State whether the environment uses Vite dev, Vite preview, Express, server.js, middleware mode, or another mode.
+
+3. HTTP AND WEBSOCKET ROUTING BEFORE THE FIX
+
+Document:
+
+• public browser origin;
+• internal server origin;
+• HTTP route;
+• previous WebSocket target;
+• reverse-proxy behavior.
+
+Do not expose secrets.
+
+4. CORRECTION IMPLEMENTED
+
+Explain:
+
+• host handling;
+• internal port;
+• public host;
+• protocol;
+• client port;
+• WebSocket path;
+• environment detection;
+• fallback behavior, if required.
+
+5. MODIFIED FILES
+
+For each file, provide:
+
+• complete path;
+• purpose;
+• exact category of modification;
+• risk level;
+• test performed.
+
+6. ENVIRONMENT VARIABLES
+
+List:
+
+• variable name;
+• purpose;
+• whether it is public or secret;
+• example format using placeholder values only;
+• environment in which it is required.
+
+7. LOCAL DEVELOPMENT RESULT
+
+State whether:
+
+• localhost loads;
+• HMR connects;
+• source updates are received.
+
+8. GOOGLE AI STUDIO PREVIEW RESULT
+
+State whether:
+
+• HTTPS loads;
+• WSS connects;
+• localhost is no longer targeted;
+• console errors remain.
+
+9. PRODUCTION RESULT
+
+State:
+
+• TypeScript result;
+• build command;
+• Vite build result;
+• esbuild result;
+• production-server result;
+• confirmation that HMR is absent from production.
+
+10. REGRESSION STATUS
+
+State whether the following remain operational:
+
+• Login;
+• Coordination;
+• Teacher;
+• Support Professional;
+• Firestore;
+• Curriculum Matrix;
+• A4 editor;
+• PDF;
+• Google Drive;
+• official logos;
+• Brazilian Portuguese interface.
+
+11. TEST MATRIX
+
+Mark each required test:
+
+• PASSED;
+• FAILED;
+• NOT EXECUTED;
+• NOT APPLICABLE.
+
+12. SECURITY REVIEW
+
+State:
+
+• allowedHosts behavior;
+• CORS behavior;
+• WebSocket origin behavior;
+• secret-exposure result;
+• logging result.
+
+13. KNOWN LIMITATIONS
+
+Report only real remaining limitations.
+
+14. ROLLBACK PROCEDURE
+
+Explain exactly how to restore the previous files and configuration.
+
+15. FINAL ACCEPTANCE STATUS
+
+Mark the correction:
+
+• COMPLETED;
+• PARTIALLY COMPLETED;
+• NOT COMPLETED.
+
+Do not mark it COMPLETED if the public preview still produces the WebSocket connection error.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+22. FINAL EXECUTION COMMAND
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+BEGIN THE AUTONOMOUS CORRECTION NOW.
+
+First inspect the complete project and establish the real runtime mode.
+
+Then create a safe checkpoint.
+
+After that:
+
+1. reproduce the existing build;
+2. inspect the browser’s HMR WebSocket target;
+3. inspect the reverse-proxy behavior;
+4. inspect the installed Vite 8 types and supported WebSocket configuration;
+5. identify the exact root cause;
+6. implement the smallest secure environment-aware correction;
+7. preserve every existing application feature;
+8. run the required local-development tests;
+9. run the public-preview tests;
+10. run the production tests;
+11. run regression tests;
+12. correct any issue introduced by the change;
+13. provide the final engineering report.
+
+Do not stop after analyzing the logs.
+
+Do not return only a suggested code fragment.
+
+Modify the actual project files.
+
+Do not claim success based only on “Build successful.”
+
+The build was already successful before this correction.
+
+Success requires resolving or safely controlling the runtime HMR WebSocket connection in the Google AI Studio preview without damaging localhost development, LAN access, production deployment, Firebase, Google Drive, A4 generation, PDF generation, institutional branding, data, or existing application modules.
+
+All application-facing output must remain in Brazilian Portuguese.

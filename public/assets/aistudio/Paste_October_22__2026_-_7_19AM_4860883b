@@ -1,0 +1,1306 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+22. MANUTENÇÃO INTEGRAL DO SISTEMA EXISTENTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MANTENHA INTEGRALMENTE TODAS AS REGRAS, CONFIGURAÇÕES, FUNÇÕES, INTEGRAÇÕES, TELAS, MÓDULOS E INSTRUÇÕES ANTERIORES DESTE PROMPT.
+
+As instruções seguintes são complementares e destinam-se principalmente ao aprimoramento do módulo de geração de atividades pedagógicas adaptadas.
+
+NÃO altere indevidamente:
+
+• configurações atuais do projeto;
+• estrutura do banco de dados sem necessidade comprovada;
+• variáveis de ambiente existentes;
+• credenciais e integrações já configuradas;
+• regras de autenticação que estejam funcionando corretamente;
+• nomes das coleções e campos já utilizados;
+• identidade visual institucional;
+• perfis de acesso;
+• cadastros existentes;
+• documentos armazenados;
+• funcionalidades que já estejam operacionais;
+• estrutura dos PEIs;
+• relatórios já preenchidos;
+• matrizes curriculares importadas;
+• vínculos entre estudantes, turmas e profissionais;
+• permissões existentes, exceto quando houver falha de segurança;
+• configurações de impressão;
+• configurações do Firebase e Google Drive que estejam corretas.
+
+Antes de alterar qualquer configuração, faça uma análise de impacto.
+
+Somente modifique configurações quando existir erro comprovado, incompatibilidade, risco de segurança ou necessidade indispensável para fazer a funcionalidade operar. Nesses casos:
+
+1. preserve os valores existentes;
+2. crie um checkpoint antes da alteração;
+3. documente exatamente o que foi alterado;
+4. mantenha compatibilidade com os dados anteriores;
+5. não exponha credenciais;
+6. não apague configurações para recriá-las;
+7. teste a alteração antes de considerá-la concluída.
+
+Não recrie o sistema do zero.
+
+Não remova funcionalidades para simplificar o desenvolvimento.
+
+Não transforme funcionalidades reais em demonstrações.
+
+Não substitua dados do banco por dados simulados.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+23. OBJETIVO DO APRIMORAMENTO DA GERAÇÃO DE ATIVIDADES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Aprimore profundamente o módulo de criação de atividades do professor para que cada atividade seja construída com base em três fontes integradas e obrigatórias:
+
+FONTE 1 — MATRIZ CURRICULAR
+• componente curricular;
+• ano ou série;
+• turma;
+• bimestre;
+• unidade temática;
+• objeto de conhecimento;
+• conteúdo previsto;
+• código da habilidade;
+• descrição completa da habilidade;
+• expectativas ou objetivos de aprendizagem;
+• demais campos existentes na matriz importada.
+
+FONTE 2 — PLANEJAMENTO E SOLICITAÇÃO DO PROFESSOR
+• conteúdo proposto pelo professor;
+• objetivo da aula;
+• tipo de atividade;
+• quantidade de questões;
+• nível de dificuldade;
+• forma de apresentação;
+• recursos solicitados;
+• características visuais;
+• orientações de aplicação;
+• critérios de avaliação.
+
+FONTE 3 — NECESSIDADES PEDAGÓGICAS REGISTRADAS
+• PEI do estudante, quando houver;
+• adaptações já autorizadas;
+• atividades anteriores;
+• desempenho registrado;
+• observações pedagógicas;
+• relatório do profissional de apoio;
+• dificuldades observadas na realização da atividade;
+• estratégias que funcionaram;
+• estratégias que não funcionaram;
+• nível de ajuda necessário;
+• recursos utilizados;
+• resposta do estudante à atividade.
+
+A atividade final deverá resultar da integração dessas três fontes, sem inventar dados, habilidades, diagnósticos ou informações sobre o estudante.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+24. FLUXO OBRIGATÓRIO PARA CRIAÇÃO DA ATIVIDADE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Ao solicitar uma nova atividade, o sistema deverá seguir esta sequência:
+
+1. identificar o usuário autenticado;
+2. confirmar que o usuário possui perfil de Professor ou outra permissão autorizada;
+3. identificar a escola;
+4. identificar a turma;
+5. identificar o estudante, quando a atividade for individualizada;
+6. identificar o ano ou a série;
+7. identificar o componente curricular;
+8. identificar o bimestre selecionado;
+9. consultar a matriz curricular correspondente;
+10. carregar as unidades temáticas disponíveis;
+11. carregar os objetos de conhecimento disponíveis;
+12. carregar os conteúdos existentes;
+13. carregar as habilidades correspondentes;
+14. verificar o conteúdo informado pelo professor;
+15. relacionar o conteúdo informado com a matriz;
+16. consultar as adaptações autorizadas no PEI;
+17. consultar o último relatório pertinente do profissional de apoio;
+18. consultar o histórico de atividades anteriores;
+19. identificar dificuldades registradas;
+20. sugerir a estrutura da atividade;
+21. permitir revisão pelo professor;
+22. gerar a atividade;
+23. apresentar uma visualização antes de salvar;
+24. permitir edição manual;
+25. permitir aprovação ou rejeição;
+26. salvar somente após ação consciente do professor;
+27. gerar versão para impressão;
+28. permitir baixar em PDF.
+
+O professor deverá permanecer responsável pela validação pedagógica final.
+
+Nenhuma atividade deverá ser automaticamente aplicada ao estudante sem revisão e aprovação do professor.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+25. VINCULAÇÃO OBRIGATÓRIA COM A MATRIZ CURRICULAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Toda atividade gerada deverá estar vinculada a um registro verdadeiro da matriz curricular cadastrada ou importada no sistema.
+
+A atividade deverá registrar internamente:
+
+• identificador da matriz utilizada;
+• componente curricular;
+• ano ou série;
+• bimestre;
+• unidade temática;
+• objeto de conhecimento;
+• conteúdo;
+• código da habilidade;
+• descrição integral da habilidade;
+• data da geração;
+• professor responsável;
+• estudante ou turma de destino;
+• versão da atividade;
+• origem da habilidade;
+• origem do conteúdo.
+
+Ao selecionar componente curricular, ano ou série e bimestre, o sistema deverá filtrar somente as informações correspondentes.
+
+Não misture habilidades de:
+
+• componentes curriculares diferentes;
+• anos ou séries diferentes;
+• bimestres diferentes;
+• matrizes diferentes;
+• arquivos diferentes sem indicação da origem.
+
+Não invente códigos de habilidades.
+
+Não complete códigos incompletos por suposição.
+
+Não modifique a redação oficial da habilidade armazenada.
+
+Caso o professor informe um conteúdo que não tenha correspondência clara com a matriz selecionada:
+
+1. não invente uma associação;
+2. mostre a mensagem “Não foi encontrada correspondência segura entre o conteúdo informado e a matriz selecionada”;
+3. apresente resultados próximos apenas como sugestões;
+4. identifique cada sugestão como “correspondência sugerida”;
+5. mostre unidade temática, objeto de conhecimento, conteúdo e habilidade;
+6. exija que o professor escolha ou confirme a associação;
+7. permita selecionar outra matriz, bimestre, componente ou conteúdo;
+8. não gere a versão final sem uma habilidade validada, salvo quando o professor registrar justificativa pedagógica.
+
+Se a matriz admitir atividades sem código de habilidade, preserve essa condição e registre a justificativa, sem gerar códigos fictícios.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+26. BUSCA INTELIGENTE DO CONTEÚDO NA MATRIZ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Implemente uma busca inteligente, precisa e rastreável na matriz curricular.
+
+A busca deverá considerar:
+
+• correspondência exata;
+• palavras-chave;
+• variações linguísticas;
+• singular e plural;
+• termos semanticamente próximos;
+• unidade temática;
+• objeto de conhecimento;
+• descrição da habilidade;
+• conteúdo do bimestre;
+• componente curricular;
+• ano ou série.
+
+A busca inteligente não poderá substituir a validação da matriz original.
+
+Sempre mostre ao professor:
+
+• o conteúdo encontrado;
+• onde o conteúdo foi encontrado;
+• a habilidade relacionada;
+• o código da habilidade, quando existir;
+• o bimestre;
+• o componente;
+• o ano ou série;
+• o nível de correspondência;
+• a origem do registro.
+
+Use, se tecnicamente compatível com o projeto, níveis de correspondência como:
+
+• correspondência exata;
+• correspondência alta;
+• correspondência parcial;
+• correspondência insuficiente.
+
+Não apresente um percentual fictício. Se não houver método real para calcular percentual de correspondência, use apenas classificações textuais explicáveis.
+
+Quando houver mais de uma possibilidade válida, apresente as opções ao professor para escolha. Não selecione silenciosamente uma habilidade ambígua.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+27. UTILIZAÇÃO RESPONSÁVEL DO MOTOR DE INTELIGÊNCIA ARTIFICIAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Utilize toda a capacidade tecnicamente disponível do motor de inteligência artificial integrado ao projeto para:
+
+• compreender o conteúdo proposto;
+• localizar correspondências na matriz;
+• sugerir formatos de atividade;
+• produzir enunciados claros;
+• adaptar a complexidade;
+• organizar elementos visuais;
+• gerar alternativas pedagógicas;
+• propor formas de apoio;
+• variar questões;
+• gerar instruções de aplicação;
+• criar critérios de avaliação;
+• sugerir recursos acessíveis;
+• reformular atividades anteriores;
+• produzir uma atividade coerente com o perfil pedagógico registrado.
+
+A inteligência artificial deverá trabalhar exclusivamente com dados autorizados e necessários.
+
+A inteligência artificial não poderá:
+
+• inventar habilidades;
+• inventar códigos curriculares;
+• produzir diagnósticos;
+• rotular o estudante;
+• definir incapacidade;
+• alterar o PEI automaticamente;
+• alterar relatórios;
+• substituir a avaliação profissional;
+• tomar decisões pedagógicas irreversíveis;
+• expor dados pessoais;
+• usar dados de estudantes para treinamento externo;
+• apresentar conteúdo da internet como se pertencesse à matriz;
+• copiar atividade protegida integralmente de fonte externa;
+• enviar informações sensíveis a serviços sem autorização.
+
+Toda sugestão gerada pela inteligência artificial deverá passar por revisão do professor antes de ser salva como versão definitiva.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+28. GERAÇÃO OU BUSCA DE ATIVIDADES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+O módulo poderá:
+
+1. gerar uma atividade nova;
+2. reutilizar uma atividade institucional autorizada;
+3. buscar uma atividade no repositório interno;
+4. adaptar uma atividade anterior;
+5. propor atividade com base em modelo autorizado;
+6. recuperar uma atividade já validada para a mesma habilidade;
+7. produzir uma nova versão considerando relatório posterior.
+
+Se o sistema buscar atividades existentes, priorize:
+
+• repositório interno da escola;
+• atividades produzidas e autorizadas pelos professores;
+• banco de atividades previamente validado;
+• modelos institucionais;
+• materiais cuja utilização esteja autorizada.
+
+Se houver integração com fonte externa, o sistema deverá:
+
+• respeitar direitos autorais;
+• registrar a origem;
+• não reproduzir integralmente material protegido sem autorização;
+• indicar que se trata de referência externa;
+• não confundir material externo com matriz curricular;
+• permitir revisão antes da utilização.
+
+A atividade selecionada ou gerada deverá permanecer alinhada à habilidade e ao conteúdo escolhidos.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+29. INTEGRAÇÃO COM O RELATÓRIO DO PROFISSIONAL DE APOIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Implemente uma integração funcional entre:
+
+• atividade aplicada;
+• relatório do profissional de apoio;
+• retorno do professor;
+• geração da próxima atividade;
+• matriz curricular;
+• histórico pedagógico do estudante.
+
+O profissional de apoio deverá conseguir associar o relatório à atividade efetivamente aplicada.
+
+O relatório deverá permitir, conforme os campos já existentes ou mediante ampliação compatível:
+
+• selecionar a atividade observada;
+• informar a data da aplicação;
+• indicar se a atividade foi iniciada;
+• indicar se foi concluída;
+• registrar o nível de ajuda;
+• registrar as dificuldades observadas;
+• registrar estratégias utilizadas;
+• registrar recursos de acessibilidade utilizados;
+• informar quais partes foram realizadas;
+• informar quais partes não foram realizadas;
+• descrever a resposta do estudante;
+• registrar sugestões para a próxima atividade;
+• anexar evidências, quando autorizado;
+• salvar como rascunho;
+• finalizar o relatório.
+
+Inclua categorias pedagógicas estruturadas, sem retirar o campo de descrição livre:
+
+• realizou com autonomia;
+• realizou com apoio leve;
+• realizou com apoio moderado;
+• realizou com apoio intenso;
+• realizou parcialmente;
+• não iniciou;
+• não concluiu;
+• atividade não aplicada;
+• recusou a proposta;
+• não foi possível avaliar;
+• outro resultado, com descrição.
+
+Não interprete automaticamente “não realizou” como incapacidade.
+
+O sistema precisa diferenciar:
+
+• dificuldade de compreensão;
+• dificuldade de leitura;
+• dificuldade de escrita;
+• dificuldade de atenção;
+• dificuldade motora;
+• dificuldade de comunicação;
+• dificuldade relacionada ao formato;
+• dificuldade relacionada ao tamanho da atividade;
+• dificuldade relacionada ao tempo;
+• dificuldade relacionada à mediação;
+• ausência de recurso necessário;
+• atividade não aplicada;
+• interrupção externa;
+• informação insuficiente.
+
+Essas categorias servem para orientar a adaptação e não constituem diagnóstico.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+30. ADAPTAÇÃO DA PRÓXIMA ATIVIDADE APÓS O RELATÓRIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Quando o relatório do profissional de apoio indicar que o estudante não conseguiu realizar, concluir ou compreender a atividade, o sistema deverá ativar o fluxo “Revisar e adaptar próxima atividade”.
+
+O sistema não deverá simplesmente repetir a mesma atividade.
+
+O sistema deverá:
+
+1. localizar a atividade original;
+2. identificar a matriz vinculada;
+3. manter a mesma habilidade, quando pedagogicamente adequado;
+4. manter o objetivo essencial de aprendizagem;
+5. ler somente os campos autorizados do relatório;
+6. identificar as barreiras relatadas;
+7. verificar as adaptações previstas no PEI;
+8. consultar estratégias anteriores que funcionaram;
+9. sugerir uma versão adaptada;
+10. explicar ao professor o que foi alterado;
+11. apresentar comparação entre a versão anterior e a nova;
+12. solicitar aprovação do professor;
+13. salvar a nova atividade como outra versão;
+14. manter o histórico da atividade original;
+15. vincular a nova versão ao relatório que motivou a adaptação.
+
+Nunca substitua ou apague a atividade anterior.
+
+Use controle de versões, por exemplo:
+
+• Versão 1: atividade original;
+• Relatório de aplicação da Versão 1;
+• Versão 2: atividade adaptada após o relatório;
+• Relatório de aplicação da Versão 2.
+
+A versão adaptada deverá manter rastreabilidade com:
+
+• atividade de origem;
+• habilidade;
+• conteúdo;
+• relatório considerado;
+• alterações realizadas;
+• responsável pela aprovação;
+• data;
+• versão.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+31. ESTRATÉGIAS DE ADAPTAÇÃO PEDAGÓGICA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Com base na dificuldade efetivamente registrada, o sistema poderá sugerir:
+
+• redução da quantidade de itens;
+• divisão da atividade em etapas;
+• simplificação da linguagem do enunciado;
+• frases mais curtas;
+• destaque das palavras principais;
+• exemplo resolvido;
+• instrução acompanhada de imagem;
+• ampliação de fonte;
+• maior espaçamento;
+• aumento da área para resposta;
+• respostas por marcação;
+• associação entre colunas;
+• ligação de elementos;
+• recorte e colagem;
+• ordenação de imagens;
+• uso de pictogramas autorizados;
+• uso de fotografias;
+• apoio visual;
+• apoio concreto ou manipulável;
+• alternativa de resposta oral;
+• alternativa de resposta por apontamento;
+• atividade com desenho;
+• atividade com letra bastão;
+• uso de caixa alta;
+• redução de estímulos visuais;
+• contraste mais adequado;
+• uma questão por bloco;
+• uma questão por página, quando necessário;
+• ampliação do tempo;
+• mediação em etapas;
+• repetição com variação;
+• retomada de pré-requisitos;
+• atividade com menor complexidade inicial;
+• progressão gradual de dificuldade.
+
+Não aplique todas as adaptações ao mesmo tempo.
+
+Escolha apenas as adaptações justificadas pelos registros disponíveis.
+
+Quando o relatório não apresentar informação suficiente, o sistema deverá informar:
+
+“Não há informações suficientes para propor uma adaptação segura. O professor deverá selecionar manualmente as estratégias desejadas.”
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+32. DEFINIÇÃO DO NÍVEL DE DIFICULDADE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Permita ao professor selecionar:
+
+• introdutório;
+• básico;
+• intermediário;
+• avançado;
+• personalizado.
+
+O nível deverá alterar o formato da atividade, mas não deverá descaracterizar a habilidade escolhida.
+
+Quando houver dificuldade registrada, o sistema poderá sugerir:
+
+• reduzir temporariamente a complexidade;
+• recuperar pré-requisitos;
+• dividir o objetivo em etapas;
+• usar maior apoio visual;
+• diminuir a quantidade sem eliminar o objetivo central;
+• manter a habilidade com forma de resposta diferente.
+
+Reduzir a quantidade de questões não significa automaticamente reduzir a aprendizagem esperada.
+
+O sistema deverá preservar o objetivo essencial e explicar a adaptação realizada.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+33. OPÇÃO “ATIVIDADE COM DESENHO”
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Quando o professor marcar a opção “Desenho”, a atividade deverá ser realmente construída para utilizar desenho como recurso pedagógico, e não apenas apresentar uma imagem decorativa.
+
+O sistema deverá permitir:
+
+• desenho como resposta;
+• desenho para completar;
+• desenho para representar conceito;
+• desenho para relacionar conteúdo;
+• desenho para colorir com finalidade pedagógica;
+• ilustração associada ao enunciado;
+• espaço adequado para desenhar;
+• contorno simples para completar;
+• sequência visual;
+• desenho orientado por etapas;
+• representação gráfica de situações;
+• produção de legenda, quando adequada;
+• atividade mista com desenho e escrita.
+
+Regras para a opção “Desenho”:
+
+• reservar área suficiente na folha;
+• evitar elementos decorativos excessivos;
+• usar traços nítidos;
+• manter bom contraste;
+• não sobrepor imagem e texto;
+• não cortar imagens na impressão;
+• utilizar imagens coerentes com o conteúdo;
+• não inserir imagens sem função pedagógica;
+• não distorcer figuras;
+• garantir que a imagem permaneça legível em impressão colorida e em escala de cinza;
+• fornecer texto alternativo na versão digital;
+• respeitar direitos de uso das imagens.
+
+Se a atividade exigir desenho livre, inclua um quadro amplo.
+
+Se a atividade exigir completar uma figura, disponibilize a figura com resolução adequada.
+
+Se a atividade exigir colorir, informe claramente o objetivo pedagógico, evitando que a pintura seja somente decorativa.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+34. OPÇÃO “LETRA BASTÃO”
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Quando o professor marcar a opção “Letra bastão”, todo o conteúdo destinado ao estudante deverá ser apresentado em letra bastão, preferencialmente em CAIXA ALTA.
+
+A aplicação deverá alcançar:
+
+• título;
+• nome dos campos;
+• enunciados;
+• alternativas;
+• palavras de apoio;
+• legendas;
+• instruções;
+• textos de leitura;
+• comandos;
+• caixas de resposta;
+• exemplos.
+
+Não converta para caixa alta:
+
+• códigos oficiais das habilidades;
+• endereços eletrônicos;
+• nomes técnicos cuja alteração prejudique a identificação;
+• referências;
+• metadados administrativos que não sejam destinados ao estudante.
+
+Utilize uma fonte sem serifa, simples e legível, compatível com impressão e com o projeto. Exemplos tecnicamente adequados incluem Arial, Verdana, Atkinson Hyperlegible ou fonte equivalente disponível no sistema.
+
+Não dependa de uma fonte externa que possa desaparecer durante a geração do PDF.
+
+Para letra bastão:
+
+• evitar fontes decorativas;
+• evitar letras condensadas;
+• evitar texto excessivamente pequeno;
+• usar espaçamento confortável;
+• não usar itálico em blocos destinados ao estudante;
+• garantir contraste suficiente;
+• manter consistência em toda a atividade.
+
+Quando “Desenho” e “Letra bastão” forem selecionados simultaneamente, a atividade deverá combinar os dois recursos de forma harmoniosa:
+
+• texto em caixa alta;
+• enunciados curtos;
+• ilustrações funcionais;
+• espaço amplo para resposta;
+• elementos bem separados;
+• alinhamento consistente;
+• ausência de sobreposição;
+• leitura simples;
+• impressão limpa.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+35. OPÇÕES DO GERADOR DE ATIVIDADES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Inclua ou revise as seguintes opções no gerador, preservando as já existentes:
+
+IDENTIFICAÇÃO PEDAGÓGICA
+• estudante;
+• turma;
+• ano ou série;
+• componente curricular;
+• bimestre;
+• unidade temática;
+• objeto de conhecimento;
+• conteúdo;
+• habilidade;
+• objetivo.
+
+FORMATO
+• atividade individual;
+• atividade para a turma;
+• atividade adaptada;
+• atividade diagnóstica;
+• retomada;
+• consolidação;
+• avaliação;
+• tarefa;
+• atividade prática;
+• atividade lúdica.
+
+APRESENTAÇÃO
+• letra bastão;
+• caixa alta;
+• desenho;
+• imagens;
+• pictogramas autorizados;
+• fonte ampliada;
+• alto contraste;
+• poucas informações por bloco;
+• espaço ampliado para resposta;
+• uma questão por bloco;
+• uma questão por página;
+• versão colorida;
+• versão em escala de cinza.
+
+TIPOS DE QUESTÃO
+• múltipla escolha;
+• verdadeiro ou falso;
+• associação;
+• completar;
+• ligar;
+• ordenar;
+• resposta curta;
+• resposta por desenho;
+• recorte e colagem;
+• atividade prática;
+• produção oral;
+• produção escrita;
+• atividade mista.
+
+CONFIGURAÇÃO
+• quantidade de questões;
+• nível de dificuldade;
+• tamanho da fonte;
+• quantidade de páginas;
+• orientação;
+• cabeçalho;
+• rodapé;
+• numeração;
+• identificação do estudante;
+• espaço para data;
+• espaço para nome;
+• espaço para mediação;
+• gabarito;
+• orientações ao professor;
+• orientações ao profissional de apoio.
+
+As opções selecionadas deverão realmente modificar o documento gerado.
+
+Não crie controles meramente visuais que não alterem a atividade.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+36. SEPARAÇÃO ENTRE MATERIAL DO ESTUDANTE E ORIENTAÇÕES PROFISSIONAIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Gere, quando solicitado, três blocos separados:
+
+BLOCO 1 — ATIVIDADE DO ESTUDANTE
+• linguagem adequada;
+• conteúdo da atividade;
+• identificação;
+• questões;
+• espaços para resposta;
+• elementos visuais;
+• sem notas internas;
+• sem informações sensíveis;
+• sem justificativas técnicas.
+
+BLOCO 2 — ORIENTAÇÕES AO PROFESSOR
+• habilidade trabalhada;
+• objetivo;
+• conteúdo;
+• justificativa pedagógica;
+• adaptações realizadas;
+• forma de aplicação;
+• critérios de avaliação;
+• gabarito;
+• possíveis intervenções.
+
+BLOCO 3 — ORIENTAÇÕES AO PROFISSIONAL DE APOIO
+• como apresentar a atividade;
+• tipo de apoio permitido;
+• material necessário;
+• sinais a observar;
+• campos para registro;
+• cuidados para não fornecer a resposta;
+• orientação para registrar o nível de ajuda;
+• referência à atividade e à versão.
+
+As orientações profissionais não deverão aparecer na folha do estudante, salvo quando o professor escolher expressamente uma versão conjunta.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+37. FORMATAÇÃO OBRIGATÓRIA EM FOLHA A4
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Toda atividade destinada à impressão deverá ser formatada corretamente para papel A4.
+
+Configuração padrão:
+
+• tamanho: 210 mm × 297 mm;
+• formato: A4;
+• orientação padrão: retrato;
+• orientação paisagem quando o conteúdo exigir;
+• margens seguras entre 15 mm e 20 mm;
+• escala de impressão: 100%;
+• conteúdo dentro da área imprimível;
+• cabeçalho sem corte;
+• rodapé sem corte;
+• imagens em resolução suficiente;
+• fontes incorporadas ou compatíveis;
+• cores legíveis;
+• fundo preferencialmente branco na atividade;
+• ausência de elementos fora da página;
+• ausência de sobreposição;
+• ausência de texto cortado;
+• ausência de páginas quase vazias sem necessidade;
+• ausência de questão dividida inadequadamente entre páginas.
+
+Na implementação web, configure estilos específicos de impressão utilizando recursos equivalentes a:
+
+@page {
+  size: A4 portrait;
+  margin: 15mm;
+}
+
+Para orientação paisagem, utilize configuração equivalente a:
+
+@page {
+  size: A4 landscape;
+  margin: 15mm;
+}
+
+A implementação deverá usar as tecnologias compatíveis com o projeto existente. Não insira estas regras de forma isolada sem verificar a arquitetura e os estilos atuais.
+
+Durante a impressão:
+
+• ocultar menus;
+• ocultar botões;
+• ocultar barras laterais;
+• ocultar controles de edição;
+• ocultar elementos de navegação;
+• manter apenas o documento;
+• preservar cabeçalho institucional quando selecionado;
+• impedir quebra dentro de questões;
+• manter título e primeira questão de forma organizada;
+• controlar quebras de página;
+• repetir cabeçalho apenas quando necessário;
+• manter área suficiente para respostas manuscritas.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+38. VISUALIZAÇÃO PRÉVIA DA ATIVIDADE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Antes de baixar ou imprimir, apresente uma visualização fiel à folha A4.
+
+A visualização deverá:
+
+• representar a proporção real da página;
+• mostrar todas as páginas;
+• indicar quebra de página;
+• permitir zoom;
+• permitir avançar e voltar;
+• mostrar orientação retrato ou paisagem;
+• atualizar após edição;
+• sinalizar conteúdo fora da área imprimível;
+• sinalizar imagens de baixa resolução;
+• evitar diferença entre visualização e PDF;
+• permitir verificar letra bastão;
+• permitir verificar desenhos;
+• permitir verificar espaços para resposta;
+• permitir verificar se o cabeçalho está correto.
+
+Inclua os comandos:
+
+• Visualizar;
+• Editar;
+• Gerar novamente;
+• Aprovar;
+• Salvar rascunho;
+• Baixar PDF;
+• Imprimir;
+• Duplicar;
+• Criar versão adaptada;
+• Cancelar.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+39. GERAÇÃO E DOWNLOAD EM PDF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Garanta que o botão “Baixar PDF” gere um arquivo PDF real, válido, completo e pronto para impressão.
+
+O PDF deverá:
+
+• utilizar folha A4;
+• manter a orientação selecionada;
+• preservar fontes;
+• preservar imagens;
+• preservar desenhos;
+• preservar caixas e linhas;
+• evitar elementos cortados;
+• evitar diferenças relevantes em relação à visualização;
+• permitir impressão;
+• abrir nos leitores de PDF comuns;
+• possuir nome de arquivo organizado;
+• não ficar corrompido;
+• não depender da sessão para ser aberto após o download;
+• não expor dados de outro estudante;
+• respeitar as permissões do usuário.
+
+Padrão sugerido para o nome do arquivo:
+
+ATIVIDADE_[COMPONENTE]_[TURMA]_[DATA]_[VERSAO].pdf
+
+Quando o nome do estudante puder constar no arquivo e isso estiver autorizado:
+
+ATIVIDADE_[COMPONENTE]_[ESTUDANTE]_[DATA]_[VERSAO].pdf
+
+Sanitize o nome do arquivo, removendo caracteres incompatíveis.
+
+Não inclua diagnóstico, dado sensível ou informação desnecessária no nome do arquivo.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+40. GABARITO E CRITÉRIOS DE AVALIAÇÃO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Quando aplicável, gere gabarito separado.
+
+O gabarito deverá:
+
+• corresponder exatamente à atividade;
+• indicar a versão;
+• informar habilidade e objetivo;
+• não aparecer automaticamente na folha do estudante;
+• ser acessível apenas aos perfis autorizados;
+• permitir respostas alternativas quando pedagogicamente aceitáveis;
+• incluir critérios para questões abertas;
+• orientar a observação do processo, quando necessário.
+
+Em atividades adaptadas, os critérios de avaliação deverão considerar:
+
+• objetivo essencial;
+• forma de participação;
+• nível de autonomia;
+• uso de recursos;
+• compreensão demonstrada;
+• resposta possível para o estudante;
+• progresso em relação às atividades anteriores.
+
+Não reduza a avaliação apenas à quantidade de acertos.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+41. HISTÓRICO E RASTREABILIDADE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Registre no histórico:
+
+• quem gerou;
+• quem editou;
+• quem aprovou;
+• data e hora;
+• matriz utilizada;
+• habilidade utilizada;
+• conteúdo utilizado;
+• estudante ou turma;
+• opções selecionadas;
+• versão;
+• relatório utilizado na adaptação;
+• alterações entre versões;
+• data do download;
+• data da impressão, quando tecnicamente possível;
+• status da atividade.
+
+Status possíveis:
+
+• rascunho;
+• aguardando revisão;
+• aprovada;
+• aplicada;
+• relatório pendente;
+• relatório concluído;
+• adaptação sugerida;
+• nova versão em elaboração;
+• arquivada.
+
+Não permita que usuário sem autorização altere o histórico.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+42. NOTIFICAÇÕES ENTRE PROFESSOR E PROFISSIONAL DE APOIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Implemente notificações internas para integrar os fluxos.
+
+Exemplos:
+
+• “Uma nova atividade foi disponibilizada para aplicação.”
+• “O profissional de apoio concluiu o relatório da atividade.”
+• “O relatório indica necessidade de revisão da atividade.”
+• “Uma nova versão adaptada foi sugerida.”
+• “O professor aprovou a atividade adaptada.”
+• “A atividade está aguardando relatório de aplicação.”
+
+As notificações deverão:
+
+• abrir o registro correto;
+• respeitar permissões;
+• não expor dados sensíveis;
+• possuir estado lido e não lido;
+• permitir arquivamento;
+• evitar duplicação;
+• não enviar informações sensíveis por mensagem externa.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+43. REGRAS DE DECISÃO PARA ADAPTAÇÃO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Utilize regras transparentes e revisáveis.
+
+EXEMPLO 1 — DIFICULDADE DE LEITURA
+Sugestões possíveis:
+• reduzir extensão do enunciado;
+• usar letra bastão;
+• aumentar fonte;
+• inserir apoio visual;
+• apresentar uma instrução por vez.
+
+EXEMPLO 2 — DIFICULDADE DE ESCRITA
+Sugestões possíveis:
+• resposta por marcação;
+• resposta por desenho;
+• associação;
+• recorte e colagem;
+• resposta oral registrada pelo profissional autorizado;
+• ampliar área de escrita.
+
+EXEMPLO 3 — EXCESSO DE QUESTÕES
+Sugestões possíveis:
+• reduzir quantidade;
+• organizar em blocos;
+• oferecer intervalos;
+• dividir em duas aplicações;
+• preservar o objetivo essencial.
+
+EXEMPLO 4 — DIFICULDADE DE COMPREENSÃO
+Sugestões possíveis:
+• inserir exemplo;
+• reformular comando;
+• utilizar linguagem direta;
+• decompor em etapas;
+• retomar conhecimento anterior.
+
+EXEMPLO 5 — DIFICULDADE MOTORA
+Sugestões possíveis:
+• ampliar área de resposta;
+• reduzir necessidade de escrita;
+• disponibilizar seleção ou apontamento;
+• usar traços maiores;
+• permitir recurso assistivo autorizado.
+
+Esses exemplos não deverão funcionar como diagnóstico nem como regra rígida.
+
+O professor deverá visualizar:
+
+• dificuldade registrada;
+• adaptação sugerida;
+• motivo da sugestão;
+• elementos da atividade alterados;
+• elementos preservados;
+• habilidade preservada;
+• opções para aceitar, editar ou rejeitar.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+44. PROTEÇÃO DOS DADOS NOS RELATÓRIOS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Os relatórios do profissional de apoio contêm informações pedagógicas restritas.
+
+Garanta que:
+
+• apenas usuários autorizados tenham acesso;
+• o profissional de apoio veja apenas estudantes vinculados;
+• o professor veja apenas estudantes e turmas autorizados;
+• a Coordenação tenha acesso conforme suas atribuições;
+• o relatório não fique público;
+• o relatório não seja incluído integralmente na folha da atividade;
+• apenas dados necessários sejam enviados ao gerador de IA;
+• campos sensíveis não apareçam em logs;
+• exportações sejam controladas;
+• downloads sejam auditáveis;
+• exclusões exijam permissão;
+• alterações mantenham histórico;
+• anexos utilizem armazenamento seguro.
+
+A atividade poderá utilizar o conteúdo pedagógico necessário do relatório, mas não deverá reproduzir observações sensíveis ou identificadoras na folha destinada ao estudante.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+45. VALIDAÇÕES OBRIGATÓRIAS DO GERADOR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Antes de permitir a geração, valide:
+
+• estudante ou turma selecionada;
+• componente selecionado;
+• ano ou série;
+• bimestre;
+• matriz localizada;
+• conteúdo selecionado;
+• habilidade selecionada;
+• objetivo preenchido ou derivado com validação;
+• quantidade de questões válida;
+• opções de acessibilidade;
+• permissão do usuário;
+• disponibilidade dos dados;
+• relação entre conteúdo e matriz.
+
+Antes de salvar, valide:
+
+• atividade não vazia;
+• ausência de campos “undefined”;
+• ausência de códigos fictícios;
+• ausência de texto técnico;
+• ausência de conteúdo impróprio;
+• ausência de informações confidenciais;
+• correta vinculação com a matriz;
+• correta vinculação com a atividade anterior, quando for adaptação;
+• existência de versão;
+• integridade do PDF;
+• layout A4;
+• ausência de sobreposição;
+• ausência de corte.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+46. TESTES ESPECÍFICOS DO GERADOR DE ATIVIDADES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Além dos testes já determinados anteriormente, execute:
+
+1. selecionar turma, componente, bimestre e habilidade;
+2. localizar conteúdo por correspondência exata;
+3. localizar conteúdo por palavras semelhantes;
+4. testar conteúdo sem correspondência;
+5. testar duas habilidades possíveis;
+6. impedir geração com matriz ausente;
+7. gerar atividade individual;
+8. gerar atividade para a turma;
+9. gerar atividade com letra bastão;
+10. verificar se todo o texto do estudante ficou em caixa alta;
+11. gerar atividade com desenho;
+12. verificar se o desenho possui função pedagógica;
+13. gerar atividade com desenho e letra bastão;
+14. gerar atividade com fonte ampliada;
+15. gerar atividade com uma questão por página;
+16. gerar atividade com resposta por marcação;
+17. gerar atividade com resposta por desenho;
+18. visualizar em A4;
+19. imprimir em A4;
+20. baixar em PDF;
+21. abrir o PDF baixado;
+22. verificar margens;
+23. verificar imagens;
+24. verificar quebras de página;
+25. verificar se questões não foram cortadas;
+26. associar relatório a uma atividade;
+27. registrar que o estudante realizou parcialmente;
+28. registrar que o estudante não conseguiu concluir;
+29. indicar a barreira observada;
+30. gerar sugestão de adaptação;
+31. comparar versão original e adaptada;
+32. rejeitar sugestão;
+33. editar sugestão;
+34. aprovar nova versão;
+35. verificar se a atividade original foi preservada;
+36. verificar rastreabilidade;
+37. verificar permissões do profissional de apoio;
+38. verificar permissões do professor;
+39. verificar se relatório de outro estudante permanece inacessível;
+40. testar em celular, tablet e computador.
+
+Não considere o módulo concluído se qualquer fluxo essencial resultar em:
+
+• tela em branco;
+• botão sem ação;
+• PDF corrompido;
+• conteúdo cortado;
+• habilidade inventada;
+• atividade sem ligação com a matriz;
+• relatório não vinculado;
+• perda da atividade original;
+• exposição de dados;
+• alteração automática sem aprovação;
+• opção “Desenho” sem efeito;
+• opção “Letra bastão” sem efeito.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+47. CRITÉRIOS DE ACEITAÇÃO DO APRIMORAMENTO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+O aprimoramento somente poderá ser considerado concluído quando:
+
+• a matriz curricular for consultada de forma real;
+• conteúdo e habilidade forem recuperados do banco ou documento importado;
+• a atividade registrar a origem da matriz;
+• o professor puder revisar antes de salvar;
+• as opções escolhidas modificarem realmente a atividade;
+• “Desenho” gerar uma atividade compatível;
+• “Letra bastão” alterar efetivamente o texto do estudante;
+• o PDF for gerado em A4;
+• a visualização corresponder ao PDF;
+• a impressão não apresentar cortes;
+• o relatório do profissional de apoio estiver ligado à atividade;
+• a dificuldade registrada puder iniciar um fluxo de adaptação;
+• a versão anterior for preservada;
+• a versão adaptada continuar relacionada à matriz;
+• o professor aprovar a versão antes da aplicação;
+• as permissões forem respeitadas;
+• os dados sensíveis estiverem protegidos;
+• não existirem erros críticos no console;
+• o projeto compilar corretamente;
+• as demais funcionalidades do sistema continuarem funcionando.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+48. NÃO ACEITAR IMPLEMENTAÇÕES SUPERFICIAIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Não considere como implementação válida:
+
+• apenas criar o botão sem programar a ação;
+• apenas criar uma tela sem conexão com o banco;
+• apenas mudar o visual;
+• apenas gerar texto sem consultar a matriz;
+• usar habilidades fixas no código;
+• usar conteúdo fictício;
+• simular integração com relatório;
+• gerar o mesmo modelo para todos;
+• mudar apenas o título para afirmar que houve adaptação;
+• utilizar a mesma atividade sem considerar a dificuldade;
+• criar PDF como imagem ilegível;
+• utilizar captura de tela como PDF;
+• cortar conteúdo para caber na folha;
+• diminuir excessivamente a fonte;
+• marcar letra bastão sem transformar o conteúdo;
+• incluir imagem decorativa e chamar de atividade com desenho;
+• apagar a versão anterior;
+• alterar automaticamente sem professor;
+• declarar sucesso sem testar.
+
+A implementação deverá estar conectada ao fluxo real do sistema.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+49. RELATÓRIO FINAL ESPECÍFICO DO MÓDULO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+No relatório final, acrescente uma seção denominada:
+
+“APRIMORAMENTO DA GERAÇÃO DE ATIVIDADES”
+
+Nessa seção, informe:
+
+1. como a matriz curricular foi integrada;
+2. como o conteúdo é localizado;
+3. como as habilidades são filtradas;
+4. como o professor escolhe e valida a habilidade;
+5. como funciona a geração por inteligência artificial;
+6. como funciona a busca no repositório;
+7. como a opção “Desenho” foi implementada;
+8. como a opção “Letra bastão” foi implementada;
+9. como o relatório do profissional de apoio é vinculado;
+10. como a dificuldade registrada influencia a próxima versão;
+11. como o professor aprova a adaptação;
+12. como o histórico de versões é preservado;
+13. como o PDF A4 é gerado;
+14. quais testes foram executados;
+15. quais arquivos foram modificados;
+16. quais limitações ainda existem;
+17. se o módulo está conectado a dados reais ou ainda depende de configuração;
+18. se o projeto compilou sem erros.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+50. ORDEM FINAL DE EXECUÇÃO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Execute as melhorias na seguinte ordem:
+
+FASE 1 — PRESERVAÇÃO
+• crie checkpoint;
+• identifique configurações existentes;
+• proteja os dados;
+• não altere o que estiver funcionando.
+
+FASE 2 — MATRIZ
+• revise a importação;
+• revise a leitura;
+• revise os filtros;
+• corrija a busca;
+• garanta rastreabilidade.
+
+FASE 3 — GERADOR
+• conecte matriz, conteúdo e habilidade;
+• implemente opções reais;
+• aprimore a utilização da IA;
+• conecte o repositório;
+• implemente validações.
+
+FASE 4 — RELATÓRIOS
+• vincule relatório e atividade;
+• estruture os resultados;
+• preserve o campo narrativo;
+• implemente permissões.
+
+FASE 5 — ADAPTAÇÃO
+• detecte necessidade de revisão;
+• produza sugestão explicável;
+• preserve a habilidade;
+• mantenha versões;
+• exija aprovação do professor.
+
+FASE 6 — DOCUMENTO
+• configure A4;
+• corrija impressão;
+• implemente visualização;
+• implemente PDF;
+• valide desenho e letra bastão.
+
+FASE 7 — TESTES
+• teste todos os fluxos;
+• teste as permissões;
+• teste os PDFs;
+• teste responsividade;
+• verifique o console;
+• corrija falhas.
+
+FASE 8 — ENTREGA
+• informe alterações;
+• informe testes;
+• informe arquivos;
+• informe configurações necessárias;
+• informe limitações verdadeiras;
+• confirme o resultado da compilação.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+51. COMANDO FINAL COMPLEMENTAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Aplique agora todas estas instruções, mantendo integralmente as instruções anteriores.
+
+Não se limite a explicar como fazer.
+
+Examine e modifique diretamente os arquivos necessários do projeto.
+
+Priorize precisão, funcionamento real, segurança, preservação dos dados, alinhamento curricular e qualidade pedagógica.
+
+Garanta que:
+
+• a atividade seja gerada com base na matriz correta;
+• o conteúdo seja localizado na matriz;
+• a habilidade seja verdadeira e rastreável;
+• o relatório do profissional de apoio seja integrado;
+• a dificuldade observada produza uma sugestão coerente de adaptação;
+• a atividade anterior nunca seja apagada;
+• o professor mantenha a decisão final;
+• as opções “Desenho” e “Letra bastão” funcionem de verdade;
+• a folha seja montada em A4;
+• a visualização seja fiel;
+• o PDF seja válido;
+• a impressão não apresente cortes;
+• as configurações existentes sejam preservadas;
+• as outras funções do sistema permaneçam operacionais;
+• nenhum dado seja inventado;
+• nenhuma habilidade seja inventada;
+• nenhuma alteração seja declarada pronta sem testes.
+
+Se encontrar limitações técnicas, não interrompa todo o trabalho. Corrija tudo o que for possível e informe com precisão:
+
+• o que foi concluído;
+• o que depende de configuração;
+• qual configuração é necessária;
+• em qual arquivo ou serviço deverá ser configurada;
+• como validar depois da configuração.
+
+NÃO encerre a execução apenas com um plano.
+
+Implemente, teste, corrija e apresente o resultado real.

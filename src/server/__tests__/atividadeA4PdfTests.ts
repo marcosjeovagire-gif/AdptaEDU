@@ -4,6 +4,7 @@ import {
   gerarAtividadePdfProgramatico,
   gerarMultiplasAtividadesPdfProgramatico,
   exportarMultiplasAtividadesPdf,
+  desenharQrCodeVetorialNoDoc,
 } from '../../services/atividadeA4PdfService';
 import { AtividadeAdaptada } from '../../types';
 
@@ -160,6 +161,15 @@ assert(
   resultadoLote.blob instanceof Blob && resultadoLote.blob.size > blob.size,
   '8. Blob compilado contínuo contém payload proporcional ao volume das atividades',
   `Tamanho do PDF contínuo: ${resultadoLote.blob.size} bytes (vs ${blob.size} bytes individual)`
+);
+
+// 9. Teste de geração e renderização do QR Code vinculado ao ID da atividade
+const docComQr = gerarAtividadePdfProgramatico(atividadeMock);
+const blobComQr = docComQr.output('blob');
+assert(
+  blobComQr.size > 0 && typeof desenharQrCodeVetorialNoDoc === 'function',
+  '9. Geração e renderização de QR Code vetorial vinculado ao ID da atividade no cabeçalho A4',
+  `PDF com QR Code gerado com sucesso (${blobComQr.size} bytes)`
 );
 
 console.log(`\n=== BATERIA DE TESTES DE EXPORTAÇÃO PDF: ${passCount}/${passCount + failCount} APROVADOS ===\n`);

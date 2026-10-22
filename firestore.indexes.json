@@ -1,0 +1,119 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "activities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "turma", "order": "ASCENDING" },
+        { "fieldPath": "criadaEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "activities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "professorId", "order": "ASCENDING" },
+        { "fieldPath": "criadaEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "activities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "criadaEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "supportRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estudanteId", "order": "ASCENDING" },
+        { "fieldPath": "dataIso", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "supportRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "profissionalResponsavelNome", "order": "ASCENDING" },
+        { "fieldPath": "dataIso", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "peis",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estudanteId", "order": "ASCENDING" },
+        { "fieldPath": "anoLetivo", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "modulo", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "usuarioResponsavelEmail", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "activities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "escolaId", "order": "ASCENDING" },
+        { "fieldPath": "criadaEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "activities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "turma", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "criadaEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "activities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "componenteCurricular", "order": "ASCENDING" },
+        { "fieldPath": "criadaEm", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "supportRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "turma", "order": "ASCENDING" },
+        { "fieldPath": "dataIso", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "supportRecords",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estudanteId", "order": "ASCENDING" },
+        { "fieldPath": "realizacao", "order": "ASCENDING" },
+        { "fieldPath": "dataIso", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "peis",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "period", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

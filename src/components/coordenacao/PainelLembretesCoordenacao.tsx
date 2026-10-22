@@ -88,11 +88,32 @@ export const PainelLembretesCoordenacao: React.FC<PainelLembretesCoordenacaoProp
   const [filtroTipo, setFiltroTipo] = useState<FiltroLembrete>('todos');
   const [buscaTexto, setBuscaTexto] = useState<string>('');
   const [lembretesIgnorados, setLembretesIgnorados] = useState<Set<string>>(new Set());
+  const [versaoCiclo, setVersaoCiclo] = useState<number>(() => {
+    return typeof window !== 'undefined' ? Number(localStorage.getItem('adaptaedu_ciclo_apoio_iniciado') || 0) : 0;
+  });
+
+  // Atualiza em tempo real se o ciclo de lançamentos for zerado pela Coordenação
+  React.useEffect(() => {
+    const handleCicloZerado = () => {
+      const novoCiclo = typeof window !== 'undefined' ? Number(localStorage.getItem('adaptaedu_ciclo_apoio_iniciado') || 0) : Date.now();
+      setVersaoCiclo(novoCiclo);
+      setLembretesIgnorados(new Set());
+    };
+    window.addEventListener('adaptaedu:lancamentos_zerados', handleCicloZerado);
+    return () => window.removeEventListener('adaptaedu:lancamentos_zerados', handleCicloZerado);
+  }, []);
 
   // Calcula todas as notificações pedagógicas em tempo real
   const lembretes = useMemo(() => {
     const lista: LembreteItem[] = [];
     const agora = new Date();
+
+    // Dias decorridos desde o início do ciclo zerado (se houver)
+    const diasDesdeInicioCiclo = versaoCiclo > 0 
+      ? Math.max(0, Math.floor((agora.getTime() - versaoCiclo) / (1000 * 3600 * 24)))
+      : 999;
+
+    const limposEm = typeof window !== 'undefined' ? Number(localStorage.getItem('adaptaedu_lembretes_limpos_em') || 0) : 0;
 
     // 1. PRAZOS DE PEIS PRESTES A VENCER OU EXPIRADOS (Aviso de 15 dias ou menos)
     peisArmazenados.forEach((pei) => {
@@ -105,6 +126,11 @@ export const PainelLembretesCoordenacao: React.FC<PainelLembretesCoordenacaoProp
         // Ciclo oficial bimestral de 60 dias a partir da criação
         const dataCriacao = pei.createdAt ? new Date(pei.createdAt) : agora;
         dataValidade = new Date(dataCriacao.getTime() + 60 * 24 * 3600 * 1000);
+      }
+
+      // Se a Coordenação acionou a limpeza de avisos de pendências, não exibe alertas que já haviam vencido antes da limpeza
+      if (limposEm > 0 && dataValidade.getTime() < limposEm) {
+        return;
       }
 
       const diffMs = dataValidade.getTime() - agora.getTime();
@@ -180,6 +206,10 @@ export const PainelLembretesCoordenacao: React.FC<PainelLembretesCoordenacaoProp
       const responsavel = est.paeResponsavelNome || 'Profissional de Apoio Escolar (PAE)';
 
       if (!ultimoReg) {
+        // Se o ciclo de lançamentos do apoio foi zerado pela Coordenação e ainda tem menos de 15 dias, não gera alerta prematuro
+        if (diasDesdeInicioCiclo < 15) {
+          return;
+        }
         // NUNCA teve registro de apoio preenchido (mais de 15 dias de defasagem)
         lista.push({
           id: `apoio-15d-nunca-${est.id}`,
@@ -197,6 +227,10 @@ export const PainelLembretesCoordenacao: React.FC<PainelLembretesCoordenacaoProp
           badgeTexto: 'Sem diário há >15 dias'
         });
       } else if (ultimoReg.diasAtras >= 15) {
+        // Se o registro anterior era do ciclo anterior e o novo ciclo tem menos de 15 dias, não gera alerta
+        if (versaoCiclo > 0 && new Date(ultimoReg.data).getTime() < versaoCiclo && diasDesdeInicioCiclo < 15) {
+          return;
+        }
         // TEVE registro, mas há 15 DIAS OU MAIS não é preenchido
         lista.push({
           id: `apoio-15d-desatualizado-${est.id}`,
@@ -214,6 +248,9 @@ export const PainelLembretesCoordenacao: React.FC<PainelLembretesCoordenacaoProp
           badgeTexto: `${ultimoReg.diasAtras}d sem registro`
         });
       } else if (ultimoReg.diasAtras >= 5) {
+        if (versaoCiclo > 0 && new Date(ultimoReg.data).getTime() < versaoCiclo && diasDesdeInicioCiclo < 5) {
+          return;
+        }
         // Aviso preventivo recente (<15 dias)
         lista.push({
           id: `apoio-recente-${est.id}`,

@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
+  BarChart3,
   Users, 
   GraduationCap, 
   BookOpen, 
@@ -18,6 +19,7 @@ import {
   Archive, 
   Eye, 
   Trash2,
+  RotateCcw,
   Home,
   Check,
   X,
@@ -82,6 +84,7 @@ import { exportAuditoriaToCSV, exportAuditoriaToPDF } from '../../services/audit
 import { previewUserImport, authorizeNewUser, validarProtecaoUltimoCoordenador, unlinkUserUid } from '../../server/authService';
 import { runAllStudentSecurityTests } from '../../server/__tests__/studentSecurityTests';
 import { runAllSecurityTests, TESTES_FIREBASE_PENDENTES } from '../../server/__tests__/authSecurityTests';
+import { DashboardView } from './DashboardView';
 import { CoordenacaoDashboardCharts } from './CoordenacaoDashboardCharts';
 import { PainelLembretesCoordenacao } from './PainelLembretesCoordenacao';
 import { RelatorioMensalApoioModal } from '../apoio/RelatorioMensalApoioModal';
@@ -96,6 +99,7 @@ import { PeiDocumento } from '../../types';
 import { baixarPeiComoPdf, sanitizarNomeArquivoPei } from '../../services/peiPdfService';
 import { obterTodosPeis } from '../../services/peiService';
 import { baixarRelatorioConsolidadoEstudantePdf } from '../../services/relatorioConsolidadoService';
+import { exportarHistoricoIntervencoesApoioPDF } from '../../services/relatorioIntervencoesApoioPdfService';
 import { 
   obterConfiguracaoBackup, 
   salvarConfiguracaoBackup,
@@ -111,6 +115,7 @@ import {
 
 export type AbaCoordenacao = 
   | 'inicio'
+  | 'dashboard'
   | 'estudantes' 
   | 'professores' 
   | 'apoio'
@@ -158,7 +163,185 @@ export interface CoordenacaoViewProps {
   onOpenCriarPei?: (estudanteId?: string) => void;
   initialTab?: AbaCoordenacao;
   initialEstudanteId?: string;
+  onZerarLancamentosEAtividades?: () => Promise<void> | void;
 }
+
+// Componente memoizado para renderização de linhas de estudantes nas tabelas por turma
+interface EstudanteTableRowProps {
+  est: Estudante;
+  isDownloadingConsolidado: boolean;
+  onSelecionarFoto: (id: string) => void;
+  onVerFicha: (est: Estudante) => void;
+  onCriarPei: (id: string) => void;
+  onAbrirPdi: (id: string) => void;
+  onBaixarRelatorioConsolidado: (est: Estudante) => void;
+  onEditar: (est: Estudante) => void;
+}
+
+const EstudanteTableRow = React.memo<EstudanteTableRowProps>(({
+  est,
+  isDownloadingConsolidado,
+  onSelecionarFoto,
+  onVerFicha,
+  onCriarPei,
+  onAbrirPdi,
+  onBaixarRelatorioConsolidado,
+  onEditar,
+}) => {
+  const iniciais = est.nome.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+
+  return (
+    <tr className="hover:bg-slate-50/80 transition-colors">
+      {/* Foto com ação de upload rápido */}
+      <td className="p-2.5 text-center">
+        <div className="relative group mx-auto w-9 h-9">
+          {est.fotoUrl ? (
+            <img 
+              src={est.fotoUrl} 
+              alt={est.nome} 
+              className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-300" 
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center border border-emerald-200">
+              {iniciais}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => onSelecionarFoto(est.id)}
+            className="absolute inset-0 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+            title="Atualizar foto do estudante"
+          >
+            <Camera className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </td>
+
+      {/* Nome */}
+      <td className="p-3">
+        <button
+          type="button"
+          onClick={() => onVerFicha(est)}
+          className="font-bold text-slate-900 hover:text-emerald-700 text-left block cursor-pointer transition-colors"
+        >
+          {est.nome}
+        </button>
+        <span className="text-[10px] text-slate-400 block">
+          Nascimento: {est.dataNascimento || 'Não informado'}
+        </span>
+      </td>
+
+      {/* Matrícula */}
+      <td className="p-3 font-mono font-semibold text-slate-600 whitespace-nowrap">
+        {est.matricula}
+      </td>
+
+      {/* Situação */}
+      <td className="p-3 whitespace-nowrap">
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+          est.situacao === 'ativo' 
+            ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+            : est.situacao === 'transferido'
+            ? 'bg-amber-100 text-amber-800 border border-amber-200'
+            : 'bg-slate-100 text-slate-600'
+        }`}>
+          {est.situacao.toUpperCase()}
+        </span>
+      </td>
+
+      {/* Diagnóstico / AEE extraído do PDF */}
+      <td className="p-3 max-w-xs">
+        {est.laudo ? (
+          <div className="bg-slate-50 border border-slate-200 p-1.5 rounded-lg text-[11px] text-slate-700 leading-snug line-clamp-2" title={est.laudo}>
+            {est.laudo}
+          </div>
+        ) : (
+          <span className="text-slate-400 italic text-[11px]">Não registrado</span>
+        )}
+      </td>
+
+      {/* PAE */}
+      <td className="p-3 whitespace-nowrap">
+        <span className="font-semibold text-slate-800 block text-xs">
+          {est.paeResponsavelNome || 'Pendente'}
+        </span>
+        {est.paeResponsavelEmail && (
+          <span className="text-[10px] text-slate-400 block font-mono">
+            {est.paeResponsavelEmail}
+          </span>
+        )}
+      </td>
+
+      {/* Responsáveis e Telefones */}
+      <td className="p-3 max-w-xs">
+        <div className="text-[11px] text-slate-600">
+          <p className="truncate font-medium">{est.responsaveis || 'Não informado'}</p>
+          <p className="text-slate-400 truncate">{est.telefones || ''}</p>
+        </div>
+      </td>
+
+      {/* Ações */}
+      <td className="p-3 text-center whitespace-nowrap">
+        <div className="flex items-center justify-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onCriarPei(est.id)}
+            className="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+            title="Criar Plano Educacional Individualizado (PEI - SEDUC-GO)"
+          >
+            <GraduationCap className="h-3 w-3 text-indigo-700" />
+            <span>PEI</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onAbrirPdi(est.id)}
+            className="px-2 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+            title="Gerar Relatório de Desempenho (PDI)"
+          >
+            <Award className="h-3 w-3" />
+            <span>PDI</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onBaixarRelatorioConsolidado(est)}
+            disabled={isDownloadingConsolidado}
+            className="px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors border border-sky-200 disabled:opacity-60"
+            title="Gerar e Baixar Relatório Consolidado em PDF (Histórico Pedagógico + Acompanhamento de Apoio SEDUC-GO)"
+          >
+            {isDownloadingConsolidado ? (
+              <Loader2 className="h-3 w-3 animate-spin text-sky-700" />
+            ) : (
+              <FileDown className="h-3 w-3 text-sky-700" />
+            )}
+            <span>Gerar Relatório PDF</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onVerFicha(est)}
+            className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+            title="Ver ficha individual"
+          >
+            <FileText className="h-3 w-3" />
+            <span>Ficha</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onEditar(est)}
+            className="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer transition-colors"
+            title="Editar estudante"
+          >
+            <Edit2 className="h-3 w-3" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+});
+EstudanteTableRow.displayName = 'EstudanteTableRow';
 
 export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
   escolaConfig,
@@ -196,8 +379,36 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
   onOpenCriarPei,
   initialTab,
   initialEstudanteId,
+  onZerarLancamentosEAtividades,
 }) => {
   const [abaAtiva, setAbaAtiva] = useState<AbaCoordenacao>(() => initialTab || 'inicio');
+
+  // Estados para Modal e Ação Exclusiva da Coordenação: Zerar Lançamentos e Atividades (Iniciar novo ciclo)
+  const [modalZerarAberto, setModalZerarAberto] = useState(false);
+  const [isZerando, setIsZerando] = useState(false);
+  const [feedbackZerarMsg, setFeedbackZerarMsg] = useState<{ tipo: 'sucesso' | 'erro'; texto: string } | null>(null);
+
+  const handleConfirmarZerarLancamentos = async () => {
+    setIsZerando(true);
+    try {
+      if (onZerarLancamentosEAtividades) {
+        await onZerarLancamentosEAtividades();
+      }
+      setModalZerarAberto(false);
+      setFeedbackZerarMsg({
+        tipo: 'sucesso',
+        texto: 'Lançamentos diários e atividades geradas foram zerados com sucesso! A contagem dos apoios foi reiniciada. Todos os estudantes, professores e profissionais de apoio continuam 100% preservados.'
+      });
+      setTimeout(() => setFeedbackZerarMsg(null), 6000);
+    } catch (err: any) {
+      setFeedbackZerarMsg({
+        tipo: 'erro',
+        texto: `Erro ao zerar dados: ${err.message || 'Falha inesperada'}`
+      });
+    } finally {
+      setIsZerando(false);
+    }
+  };
 
   // Estados locais para criação de PEI (SEDUC-GO) e exportação em PDF
   const [modalPeiInternoAberto, setModalPeiInternoAberto] = useState<boolean>(false);
@@ -423,19 +634,40 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
     setConfigBackup(updated);
   };
 
-  const handleDispararCriarPei = (estId?: string) => {
+  const handleDispararCriarPei = useCallback((estId?: string) => {
     if (onOpenCriarPei) {
       onOpenCriarPei(estId);
     } else {
       setEstudanteIdPeiInterno(estId);
       setModalPeiInternoAberto(true);
     }
-  };
+  }, [onOpenCriarPei]);
 
   const [downloadingConsolidadoAlunoId, setDownloadingConsolidadoAlunoId] = useState<string | null>(null);
   const [notificacaoConsolidado, setNotificacaoConsolidado] = useState<string | null>(null);
+  const [peisArmazenados, setPeisArmazenados] = useState<PeiDocumento[]>([]);
 
-  const handleBaixarRelatorioConsolidado = (est: Estudante) => {
+  // Sincronização em tempo real de PEIs do sistema para alimentar os cards
+  useEffect(() => {
+    let cancel = false;
+    obterTodosPeis().then((list) => {
+      if (!cancel) setPeisArmazenados(list);
+    });
+    const handleUpdate = () => {
+      obterTodosPeis().then((list) => {
+        if (!cancel) setPeisArmazenados(list);
+      });
+    };
+    window.addEventListener('adaptaedu:pei_atualizado', handleUpdate);
+    window.addEventListener('adaptaedu:pei_excluido', handleUpdate);
+    return () => {
+      cancel = true;
+      window.removeEventListener('adaptaedu:pei_atualizado', handleUpdate);
+      window.removeEventListener('adaptaedu:pei_excluido', handleUpdate);
+    };
+  }, []);
+
+  const handleBaixarRelatorioConsolidado = useCallback((est: Estudante) => {
     try {
       setDownloadingConsolidadoAlunoId(est.id);
       const peiAluno = peisArmazenados.find(p => p.studentId === est.id);
@@ -457,7 +689,22 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
     } finally {
       setDownloadingConsolidadoAlunoId(null);
     }
-  };
+  }, [peisArmazenados, perfisPedagogicos, atividades, registrosApoio, escolaConfig, currentUserName]);
+
+  const handleVerFichaEstudante = useCallback((est: Estudante) => {
+    setEstudanteFichaModal(est);
+  }, []);
+
+  const handleAbrirPdiEstudante = useCallback((estId: string) => {
+    setPdiEstudanteInicialId(estId);
+    setModalRelatorioPdiAberto(true);
+  }, []);
+
+  const handleEditarEstudante = useCallback((est: Estudante) => {
+    setEstudanteEmEdicao(est);
+    setFormEstudante({ ...est });
+    setModalEstudanteAberto(true);
+  }, []);
 
   // Sincroniza aba e estudante inicial vindos de links compartilhados
   React.useEffect(() => {
@@ -512,27 +759,6 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
 
   // Estados para animação (framer-motion) e expansão dos Cards de Estudantes
   const [cardsEstudantesExpandidos, setCardsEstudantesExpandidos] = useState<Record<string, boolean>>({});
-  const [peisArmazenados, setPeisArmazenados] = useState<PeiDocumento[]>([]);
-
-  // Sincronização em tempo real de PEIs do sistema para alimentar os cards
-  useEffect(() => {
-    let cancel = false;
-    obterTodosPeis().then((list) => {
-      if (!cancel) setPeisArmazenados(list);
-    });
-    const handleUpdate = () => {
-      obterTodosPeis().then((list) => {
-        if (!cancel) setPeisArmazenados(list);
-      });
-    };
-    window.addEventListener('adaptaedu:pei_atualizado', handleUpdate);
-    window.addEventListener('adaptaedu:pei_excluido', handleUpdate);
-    return () => {
-      cancel = true;
-      window.removeEventListener('adaptaedu:pei_atualizado', handleUpdate);
-      window.removeEventListener('adaptaedu:pei_excluido', handleUpdate);
-    };
-  }, []);
 
   // Estados para Seleção Múltipla e Exportação Contínua em Lote de Atividades (A4)
   const [atividadesSelecionadasIds, setAtividadesSelecionadasIds] = useState<Set<string>>(new Set());
@@ -986,30 +1212,67 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
     }
   };
 
-  // Estatísticas de Usuários para os Cards
-  const totalUsuarios = usuariosAutorizados.length;
-  const totalProfessores = usuariosAutorizados.filter(u => u.roles.includes('teacher')).length;
-  const totalCoordenadores = usuariosAutorizados.filter(u => u.roles.includes('coordinator')).length;
-  const totalAtivos = usuariosAutorizados.filter(u => u.active && u.status === 'authorized').length;
-  const totalInativos = usuariosAutorizados.filter(u => !u.active || u.status === 'inactive').length;
-  const totalAguardandoAcesso = usuariosAutorizados.filter(u => !u.firstAccessAt).length;
-  const totalPendentesRevisao = usuariosAutorizados.filter(u => u.status === 'inactive' || !u.email.includes('@')).length;
+  // Estatísticas de Usuários para os Cards (memoizadas em uma única iteração O(n))
+  const metricasUsuarios = useMemo(() => {
+    let professores = 0;
+    let coordenadores = 0;
+    let ativos = 0;
+    let inativos = 0;
+    let aguardandoAcesso = 0;
+    let pendentesRevisao = 0;
 
-  // Filtragem da tabela
-  const usuariosFiltrados = usuariosAutorizados.filter(u => {
-    const matchBusca = u.name.toLowerCase().includes(buscaUsuario.toLowerCase()) ||
-                       u.email.toLowerCase().includes(buscaUsuario.toLowerCase());
-    const matchRole = filtroRoleUsuario === 'todos' || u.roles.includes(filtroRoleUsuario as any);
-    const matchSituacao = filtroSituacaoUsuario === 'todos' || u.status === filtroSituacaoUsuario;
-    const matchDominio = filtroDominioUsuario === 'todos' || u.email.endsWith(filtroDominioUsuario);
-    const matchAcesso = filtroPrimeiroAcesso === 'todos' || 
-                        (filtroPrimeiroAcesso === 'aguardando' && !u.firstAccessAt) ||
-                        (filtroPrimeiroAcesso === 'acessou' && u.firstAccessAt);
-    return matchBusca && matchRole && matchSituacao && matchDominio && matchAcesso;
-  });
+    for (const u of usuariosAutorizados) {
+      if (u.roles.includes('teacher')) professores++;
+      if (u.roles.includes('coordinator')) coordenadores++;
+      if (u.active && u.status === 'authorized') ativos++;
+      if (!u.active || u.status === 'inactive') inativos++;
+      if (!u.firstAccessAt) aguardandoAcesso++;
+      if (u.status === 'inactive' || !u.email.includes('@')) pendentesRevisao++;
+    }
 
-  const totalPaginasUsuarios = Math.ceil(usuariosFiltrados.length / itensPorPagina) || 1;
-  const usuariosPaginados = usuariosFiltrados.slice((paginaUsuario - 1) * itensPorPagina, paginaUsuario * itensPorPagina);
+    return {
+      total: usuariosAutorizados.length,
+      professores,
+      coordenadores,
+      ativos,
+      inativos,
+      aguardandoAcesso,
+      pendentesRevisao,
+    };
+  }, [usuariosAutorizados]);
+
+  const totalUsuarios = metricasUsuarios.total;
+  const totalProfessores = metricasUsuarios.professores;
+  const totalCoordenadores = metricasUsuarios.coordenadores;
+  const totalAtivos = metricasUsuarios.ativos;
+  const totalInativos = metricasUsuarios.inativos;
+  const totalAguardandoAcesso = metricasUsuarios.aguardandoAcesso;
+  const totalPendentesRevisao = metricasUsuarios.pendentesRevisao;
+
+  // Filtragem da tabela (memoizada)
+  const usuariosFiltrados = useMemo(() => {
+    const buscaLower = buscaUsuario.toLowerCase();
+    return usuariosAutorizados.filter(u => {
+      const matchBusca = !buscaLower || 
+                         u.name.toLowerCase().includes(buscaLower) ||
+                         u.email.toLowerCase().includes(buscaLower);
+      const matchRole = filtroRoleUsuario === 'todos' || u.roles.includes(filtroRoleUsuario as any);
+      const matchSituacao = filtroSituacaoUsuario === 'todos' || u.status === filtroSituacaoUsuario;
+      const matchDominio = filtroDominioUsuario === 'todos' || u.email.endsWith(filtroDominioUsuario);
+      const matchAcesso = filtroPrimeiroAcesso === 'todos' || 
+                          (filtroPrimeiroAcesso === 'aguardando' && !u.firstAccessAt) ||
+                          (filtroPrimeiroAcesso === 'acessou' && u.firstAccessAt);
+      return matchBusca && matchRole && matchSituacao && matchDominio && matchAcesso;
+    });
+  }, [usuariosAutorizados, buscaUsuario, filtroRoleUsuario, filtroSituacaoUsuario, filtroDominioUsuario, filtroPrimeiroAcesso]);
+
+  const totalPaginasUsuarios = useMemo(() => {
+    return Math.ceil(usuariosFiltrados.length / itensPorPagina) || 1;
+  }, [usuariosFiltrados.length, itensPorPagina]);
+
+  const usuariosPaginados = useMemo(() => {
+    return usuariosFiltrados.slice((paginaUsuario - 1) * itensPorPagina, paginaUsuario * itensPorPagina);
+  }, [usuariosFiltrados, paginaUsuario, itensPorPagina]);
 
   // --------------------------------------------------------------------------
   // ESTUDANTES E SALAS
@@ -1064,6 +1327,59 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR', { numeric: true }));
   }, [estudantes]);
+
+  // Métricas consolidadas dos estudantes para os cards e selects (memoizadas O(n))
+  const metricasEstudantes = useMemo(() => {
+    let ativos = 0;
+    let transferidos = 0;
+    let arquivados = 0;
+    let comPae = 0;
+    let comProfessores = 0;
+
+    for (const e of estudantes) {
+      if (e.situacao === 'ativo') ativos++;
+      else if (e.situacao === 'transferido') transferidos++;
+      else if (e.situacao === 'arquivado') arquivados++;
+
+      if (e.paeResponsavelNome) comPae++;
+      if (e.professoresAutorizadosIds && e.professoresAutorizadosIds.length > 0) comProfessores++;
+    }
+
+    return {
+      total: estudantes.length,
+      ativos,
+      transferidos,
+      arquivados,
+      comPae,
+      comProfessores,
+    };
+  }, [estudantes]);
+
+  // Contagem de estudantes por turma pré-calculada (memoizada)
+  const contagemAlunosPorTurma = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const e of estudantes) {
+      if (e.turma) {
+        counts[e.turma] = (counts[e.turma] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [estudantes]);
+
+  // Contagem de estudantes por série pré-calculada (memoizada)
+  const contagemAlunosPorSerie = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const s of todasAsSeries) {
+      const f = s.toLowerCase().replace('º ano', '').replace('ª série', '').replace(' em', '').trim();
+      let qtd = 0;
+      for (const e of estudantes) {
+        const estSerie = (e.anoSerie || e.turma || '').toLowerCase();
+        if (estSerie.includes(f)) qtd++;
+      }
+      counts[s] = qtd;
+    }
+    return counts;
+  }, [estudantes, todasAsSeries]);
 
   const estudantesFiltrados = useMemo(() => {
     return estudantes.filter(est => {
@@ -1219,12 +1535,12 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  const handleSelecionarFotoEstudante = (estId: string) => {
+  const handleSelecionarFotoEstudante = useCallback((estId: string) => {
     setEstudanteIdParaUploadFoto(estId);
     if (fileInputFotoEstudanteRef.current) {
       fileInputFotoEstudanteRef.current.click();
     }
-  };
+  }, []);
 
   const handleProcessarFotoEstudante = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1327,31 +1643,66 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
           </p>
         </div>
 
-        {/* Contadores Gerais */}
-        <div className="grid grid-cols-4 gap-2 w-full md:w-auto">
-          <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-center">
-            <span className="text-[10px] text-slate-500 font-semibold block uppercase">Estudantes</span>
-            <span className="text-base font-black text-slate-900">{estudantes.length}</span>
+        {/* Contadores Gerais e Ação Administrativa Exclusiva da Coordenação */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+          <div className="grid grid-cols-4 gap-2 w-full sm:w-auto">
+            <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-center">
+              <span className="text-[10px] text-slate-500 font-semibold block uppercase">Estudantes</span>
+              <span className="text-base font-black text-slate-900">{estudantes.length}</span>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-center">
+              <span className="text-[10px] text-slate-500 font-semibold block uppercase">Usuários</span>
+              <span className="text-base font-black text-slate-900">{usuariosAutorizados.length}</span>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-center">
+              <span className="text-[10px] text-slate-500 font-semibold block uppercase">Habilidades</span>
+              <span className="text-base font-black text-slate-900">{habilidades.filter(h => h.status === 'aprovada').length}</span>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-center">
+              <span className="text-[10px] text-slate-500 font-semibold block uppercase">Atividades</span>
+              <span className="text-base font-black text-slate-900">{atividades.length}</span>
+            </div>
           </div>
-          <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-center">
-            <span className="text-[10px] text-slate-500 font-semibold block uppercase">Usuários</span>
-            <span className="text-base font-black text-slate-900">{usuariosAutorizados.length}</span>
-          </div>
-          <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-center">
-            <span className="text-[10px] text-slate-500 font-semibold block uppercase">Habilidades</span>
-            <span className="text-base font-black text-slate-900">{habilidades.filter(h => h.status === 'aprovada').length}</span>
-          </div>
-          <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-center">
-            <span className="text-[10px] text-slate-500 font-semibold block uppercase">Atividades</span>
-            <span className="text-base font-black text-slate-900">{atividades.length}</span>
-          </div>
+
+          {/* Botão Exclusivo da Coordenação: Zerar Lançamentos e Atividades */}
+          <button
+            type="button"
+            onClick={() => setModalZerarAberto(true)}
+            className="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 border border-rose-300 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer whitespace-nowrap"
+            title="Limpar dados lançados e atividades geradas, zerando lançamentos e iniciando contagem dos apoios. Preserva 100% de alunos, professores e profissionais de apoio."
+          >
+            <RotateCcw className="h-4 w-4 text-rose-600" />
+            <span>Zerar Lançamentos & Apoio</span>
+          </button>
         </div>
       </div>
+
+      {/* Banner de Feedback da Ação de Zerar Lançamentos */}
+      {feedbackZerarMsg && (
+        <div className={`mb-4 p-4 rounded-xl text-xs font-bold flex items-center justify-between border shadow-xs animate-slideDown ${
+          feedbackZerarMsg.tipo === 'sucesso'
+            ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+            : 'bg-rose-50 border-rose-300 text-rose-900'
+        }`}>
+          <div className="flex items-center gap-2.5">
+            {feedbackZerarMsg.tipo === 'sucesso' ? (
+              <CheckCircle className="h-5 w-5 text-emerald-700 shrink-0" />
+            ) : (
+              <AlertTriangle className="h-5 w-5 text-rose-700 shrink-0" />
+            )}
+            <span className="leading-relaxed">{feedbackZerarMsg.texto}</span>
+          </div>
+          <button onClick={() => setFeedbackZerarMsg(null)} className="cursor-pointer text-slate-400 hover:text-slate-700 p-1">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Navegação entre Módulos da Coordenação */}
       <div className="mb-6 flex items-center overflow-x-auto gap-2 pb-2 scrollbar-none border-b border-slate-200">
         {[
           { id: 'inicio', label: 'Início', icon: Home, alertCount: totalLembretesPendentes },
+          { id: 'dashboard', label: 'Dashboard & Gráficos', icon: BarChart3 },
           { id: 'estudantes', label: 'Estudantes', icon: Users, count: estudantes.length },
           { id: 'professores', label: 'Professores e usuários', icon: GraduationCap, count: usuariosAutorizados.length },
           { id: 'apoio', label: 'Profissional de Apoio', icon: HeartHandshake, count: registrosApoio.length },
@@ -1594,6 +1945,15 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
                         <History className="h-3.5 w-3.5 text-slate-500" />
                         <span>Auditoria</span>
                       </button>
+
+                      <button
+                        onClick={() => { setMenuAcoesRapidasAberto(false); setModalZerarAberto(true); }}
+                        className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-rose-50 text-rose-700 font-bold flex items-center gap-2 cursor-pointer"
+                        title="Limpar dados lançados e atividades geradas, zerar lançamentos e iniciar contagem dos apoios"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 text-rose-600" />
+                        <span>Zerar lançamentos & apoio</span>
+                      </button>
                     </div>
                   </div>
                 )}
@@ -1631,6 +1991,17 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
                   <span>Central Master</span>
                 </button>
               )}
+
+              {/* 8. Botão Exclusivo: Zerar Lançamentos e Atividades (Iniciar Apoio) */}
+              <button
+                type="button"
+                onClick={() => setModalZerarAberto(true)}
+                className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+                title="Limpar dados lançados e atividades geradas, zerando lançamentos e iniciando contagem dos apoios (preserva estudantes, professores e profissionais de apoio)"
+              >
+                <RotateCcw className="h-4 w-4" />
+                <span>Zerar Lançamentos & Apoio</span>
+              </button>
             </div>
           </div>
 
@@ -1686,8 +2057,31 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
           />
 
           {/* DASHBOARD ANALÍTICO RECHARTS DA COORDENAÇÃO */}
-          <CoordenacaoDashboardCharts
+          <DashboardView
             atividades={atividades}
+            registrosApoio={registrosApoio}
+            perfisPedagogicos={perfisPedagogicos}
+            estudantes={estudantes}
+            escolaConfig={escolaConfig}
+            onNavigateToTab={(tabId) => setAbaAtiva(tabId as AbaCoordenacao)}
+            onVisualizarAtividade={onVisualizarAtividadeA4}
+            onOpenRelatorioTrimestral={() => setModalRelatorioTrimestralAberto(true)}
+            onOpenRelatorioPdi={() => {
+              setPdiEstudanteInicialId(undefined);
+              setModalRelatorioPdiAberto(true);
+            }}
+          />
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MÓDULO DEDICADO: DASHBOARD ANALÍTICO RECHARTS */}
+      {/* ========================================================================= */}
+      {abaAtiva === 'dashboard' && (
+        <div className="space-y-6">
+          <DashboardView
+            atividades={atividades}
+            registrosApoio={registrosApoio}
             perfisPedagogicos={perfisPedagogicos}
             estudantes={estudantes}
             escolaConfig={escolaConfig}
@@ -2134,7 +2528,7 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
             <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
               <span className="text-[10px] text-slate-500 font-bold block uppercase truncate">Total de Estudantes</span>
-              <span className="text-lg font-black text-slate-900">{estudantes.length}</span>
+              <span className="text-lg font-black text-slate-900">{metricasEstudantes.total}</span>
             </div>
             <div className="p-3 bg-white rounded-xl border border-emerald-200 shadow-2xs">
               <span className="text-[10px] text-emerald-800 font-bold block uppercase truncate">Salas / Turmas</span>
@@ -2142,15 +2536,15 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
             </div>
             <div className="p-3 bg-white rounded-xl border border-sky-200 shadow-2xs">
               <span className="text-[10px] text-sky-800 font-bold block uppercase truncate">Estudantes Ativos</span>
-              <span className="text-lg font-black text-sky-700">{estudantes.filter(e => e.situacao === 'ativo').length}</span>
+              <span className="text-lg font-black text-sky-700">{metricasEstudantes.ativos}</span>
             </div>
             <div className="p-3 bg-white rounded-xl border border-indigo-200 shadow-2xs">
               <span className="text-[10px] text-indigo-800 font-bold block uppercase truncate">Com PAE Responsável</span>
-              <span className="text-lg font-black text-indigo-700">{estudantes.filter(e => e.paeResponsavelNome).length}</span>
+              <span className="text-lg font-black text-indigo-700">{metricasEstudantes.comPae}</span>
             </div>
             <div className="p-3 bg-white rounded-xl border border-purple-200 shadow-2xs">
               <span className="text-[10px] text-purple-800 font-bold block uppercase truncate">Professores Vinculados</span>
-              <span className="text-lg font-black text-purple-700">{estudantes.filter(e => (e.professoresAutorizadosIds || []).length > 0).length}</span>
+              <span className="text-lg font-black text-purple-700">{metricasEstudantes.comProfessores}</span>
             </div>
           </div>
 
@@ -2282,16 +2676,9 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
                   className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs focus:ring-1 focus:ring-emerald-600 cursor-pointer"
                 >
                   <option value="todas">Todas as Séries ({todasAsSeries.length})</option>
-                  {todasAsSeries.map(s => {
-                    const qtd = estudantes.filter(e => {
-                      const estSerie = (e.anoSerie || e.turma || '').toLowerCase();
-                      const f = s.toLowerCase().replace('º ano', '').replace('ª série', '').replace(' em', '').trim();
-                      return estSerie.includes(f);
-                    }).length;
-                    return (
-                      <option key={s} value={s}>{s} ({qtd} alunos)</option>
-                    );
-                  })}
+                  {todasAsSeries.map(s => (
+                    <option key={s} value={s}>{s} ({contagemAlunosPorSerie[s] || 0} alunos)</option>
+                  ))}
                 </select>
 
                 {/* Filtro por Turma */}
@@ -2301,12 +2688,9 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
                   className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold text-xs focus:ring-1 focus:ring-emerald-600 cursor-pointer"
                 >
                   <option value="todas">Todas as Turmas ({estudantes.length})</option>
-                  {todasAsSalas.map(t => {
-                    const qtd = estudantes.filter(e => e.turma === t).length;
-                    return (
-                      <option key={t} value={t}>{t} ({qtd} alunos)</option>
-                    );
-                  })}
+                  {todasAsSalas.map(t => (
+                    <option key={t} value={t}>{t} ({contagemAlunosPorTurma[t] || 0} alunos)</option>
+                  ))}
                 </select>
 
                 {/* Filtro por Situação */}
@@ -2316,9 +2700,9 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
                   className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-semibold text-xs focus:ring-1 focus:ring-emerald-600 cursor-pointer"
                 >
                   <option value="todos">Todos os Status</option>
-                  <option value="ativo">Ativos ({estudantes.filter(e => e.situacao === 'ativo').length})</option>
-                  <option value="transferido">Transferidos ({estudantes.filter(e => e.situacao === 'transferido').length})</option>
-                  <option value="arquivado">Arquivados ({estudantes.filter(e => e.situacao === 'arquivado').length})</option>
+                  <option value="ativo">Ativos ({metricasEstudantes.ativos})</option>
+                  <option value="transferido">Transferidos ({metricasEstudantes.transferidos})</option>
+                  <option value="arquivado">Arquivados ({metricasEstudantes.arquivados})</option>
                 </select>
 
                 {/* Filtro por Perfil Pedagógico */}
@@ -2476,167 +2860,19 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {grupo.estudantes.map((est) => {
-                              const iniciais = est.nome.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
-
-                              return (
-                                <tr key={est.id} className="hover:bg-slate-50/80 transition-colors">
-                                  {/* Foto com ação de upload rápido */}
-                                  <td className="p-2.5 text-center">
-                                    <div className="relative group mx-auto w-9 h-9">
-                                      {est.fotoUrl ? (
-                                        <img 
-                                          src={est.fotoUrl} 
-                                          alt={est.nome} 
-                                          className="w-9 h-9 rounded-full object-cover ring-1 ring-slate-300" 
-                                        />
-                                      ) : (
-                                        <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center border border-emerald-200">
-                                          {iniciais}
-                                        </div>
-                                      )}
-                                      <button
-                                        type="button"
-                                        onClick={() => handleSelecionarFotoEstudante(est.id)}
-                                        className="absolute inset-0 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                                        title="Atualizar foto do estudante"
-                                      >
-                                        <Camera className="h-3.5 w-3.5" />
-                                      </button>
-                                    </div>
-                                  </td>
-
-                                  {/* Nome */}
-                                  <td className="p-3">
-                                    <button
-                                      type="button"
-                                      onClick={() => setEstudanteFichaModal(est)}
-                                      className="font-bold text-slate-900 hover:text-emerald-700 text-left block cursor-pointer transition-colors"
-                                    >
-                                      {est.nome}
-                                    </button>
-                                    <span className="text-[10px] text-slate-400 block">
-                                      Nascimento: {est.dataNascimento || 'Não informado'}
-                                    </span>
-                                  </td>
-
-                                  {/* Matrícula */}
-                                  <td className="p-3 font-mono font-semibold text-slate-600 whitespace-nowrap">
-                                    {est.matricula}
-                                  </td>
-
-                                  {/* Situação */}
-                                  <td className="p-3 whitespace-nowrap">
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                      est.situacao === 'ativo' 
-                                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                                        : est.situacao === 'transferido'
-                                        ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                                        : 'bg-slate-100 text-slate-600'
-                                    }`}>
-                                      {est.situacao.toUpperCase()}
-                                    </span>
-                                  </td>
-
-                                  {/* Diagnóstico / AEE extraído do PDF */}
-                                  <td className="p-3 max-w-xs">
-                                    {est.laudo ? (
-                                      <div className="bg-slate-50 border border-slate-200 p-1.5 rounded-lg text-[11px] text-slate-700 leading-snug line-clamp-2" title={est.laudo}>
-                                        {est.laudo}
-                                      </div>
-                                    ) : (
-                                      <span className="text-slate-400 italic text-[11px]">Não registrado</span>
-                                    )}
-                                  </td>
-
-                                  {/* PAE */}
-                                  <td className="p-3 whitespace-nowrap">
-                                    <span className="font-semibold text-slate-800 block text-xs">
-                                      {est.paeResponsavelNome || 'Pendente'}
-                                    </span>
-                                    {est.paeResponsavelEmail && (
-                                      <span className="text-[10px] text-slate-400 block font-mono">
-                                        {est.paeResponsavelEmail}
-                                      </span>
-                                    )}
-                                  </td>
-
-                                  {/* Responsáveis e Telefones */}
-                                  <td className="p-3 max-w-xs">
-                                    <div className="text-[11px] text-slate-600">
-                                      <p className="truncate font-medium">{est.responsaveis || 'Não informado'}</p>
-                                      <p className="text-slate-400 truncate">{est.telefones || ''}</p>
-                                    </div>
-                                  </td>
-
-                                  {/* Ações */}
-                                  <td className="p-3 text-center whitespace-nowrap">
-                                    <div className="flex items-center justify-center gap-1.5">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDispararCriarPei(est.id)}
-                                        className="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
-                                        title="Criar Plano Educacional Individualizado (PEI - SEDUC-GO)"
-                                      >
-                                        <GraduationCap className="h-3 w-3 text-indigo-700" />
-                                        <span>PEI</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setPdiEstudanteInicialId(est.id);
-                                          setModalRelatorioPdiAberto(true);
-                                        }}
-                                        className="px-2 py-1 rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
-                                        title="Gerar Relatório de Desempenho (PDI)"
-                                      >
-                                        <Award className="h-3 w-3" />
-                                        <span>PDI</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => handleBaixarRelatorioConsolidado(est)}
-                                        disabled={downloadingConsolidadoAlunoId === est.id}
-                                        className="px-2 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors border border-sky-200 disabled:opacity-60"
-                                        title="Gerar e Baixar Relatório Consolidado em PDF (Histórico Pedagógico + Acompanhamento de Apoio SEDUC-GO)"
-                                      >
-                                        {downloadingConsolidadoAlunoId === est.id ? (
-                                          <Loader2 className="h-3 w-3 animate-spin text-sky-700" />
-                                        ) : (
-                                          <FileDown className="h-3 w-3 text-sky-700" />
-                                        )}
-                                        <span>Gerar Relatório PDF</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => setEstudanteFichaModal(est)}
-                                        className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
-                                        title="Ver ficha individual"
-                                      >
-                                        <FileText className="h-3 w-3" />
-                                        <span>Ficha</span>
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setEstudanteEmEdicao(est);
-                                          setFormEstudante({ ...est });
-                                          setModalEstudanteAberto(true);
-                                        }}
-                                        className="p-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer transition-colors"
-                                        title="Editar estudante"
-                                      >
-                                        <Edit2 className="h-3 w-3" />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
+                            {grupo.estudantes.map((est) => (
+                              <EstudanteTableRow
+                                key={est.id}
+                                est={est}
+                                isDownloadingConsolidado={downloadingConsolidadoAlunoId === est.id}
+                                onSelecionarFoto={handleSelecionarFotoEstudante}
+                                onVerFicha={handleVerFichaEstudante}
+                                onCriarPei={handleDispararCriarPei}
+                                onAbrirPdi={handleAbrirPdiEstudante}
+                                onBaixarRelatorioConsolidado={handleBaixarRelatorioConsolidado}
+                                onEditar={handleEditarEstudante}
+                              />
+                            ))}
                           </tbody>
                         </table>
                       </div>
@@ -3283,6 +3519,17 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
                 <Download className="h-4 w-4 text-emerald-700" />
                 <span>Exportar CSV ({registrosApoioFiltrados.length})</span>
               </button>
+
+              {/* Botão de Zerar Diários e Iniciar Contagem do Apoio */}
+              <button
+                type="button"
+                onClick={() => setModalZerarAberto(true)}
+                className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2 shadow-2xs transition-colors cursor-pointer"
+                title="Limpar diários e lançamentos do apoio para iniciar novo ciclo de contagem (preserva todos os alunos, professores e profissionais de apoio)"
+              >
+                <RotateCcw className="h-4 w-4 text-rose-600" />
+                <span>Zerar Diários & Iniciar Contagem</span>
+              </button>
             </div>
           </div>
 
@@ -3615,8 +3862,8 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
 
                       {/* Fotografia do Diário de Bordo & Rodapé do Card */}
                       <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs border-t border-slate-100">
-                        {/* Diário de Bordo */}
-                        <div>
+                        {/* Ações e Diário de Bordo */}
+                        <div className="flex items-center gap-2 flex-wrap">
                           {reg.fotoDiarioBordoUrl ? (
                             <button
                               type="button"
@@ -3631,6 +3878,40 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
                             </button>
                           ) : (
                             <span className="text-slate-400 text-[11px]">Sem foto do Diário de Bordo anexada</span>
+                          )}
+
+                          {estudanteAssociado && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await exportarHistoricoIntervencoesApoioPDF({
+                                    aluno: estudanteAssociado,
+                                    registros: registrosApoio,
+                                    escolaConfig,
+                                    currentUser: {
+                                      id: reg.profissionalResponsavelId,
+                                      name: reg.profissionalResponsavelNome,
+                                      email: reg.profissionalResponsavelEmail,
+                                      role: 'apoio',
+                                    } as any,
+                                    profissionalSelecionado: {
+                                      id: reg.profissionalResponsavelId,
+                                      name: reg.profissionalResponsavelNome,
+                                      email: reg.profissionalResponsavelEmail,
+                                    },
+                                    periodoRotulo: 'Ciclo Letivo Vigente (2026)',
+                                  });
+                                } catch (e) {
+                                  console.error('Erro ao exportar PDF de intervenções:', e);
+                                }
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-xs shadow-2xs transition-colors cursor-pointer"
+                              title={`Exportar Histórico Consolidado de Intervenções em PDF (A4 • Margens 10mm) de ${reg.nomeEstudante}`}
+                            >
+                              <FileDown className="h-3.5 w-3.5 text-emerald-700" />
+                              <span>PDF Intervenções (A4)</span>
+                            </button>
                           )}
                         </div>
 
@@ -4055,6 +4336,17 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
                     <span>Desmarcar ({atividadesSelecionadasIds.size})</span>
                   </button>
                 )}
+
+                {/* Botão de Zerar Atividades & Lançamentos */}
+                <button
+                  type="button"
+                  onClick={() => setModalZerarAberto(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+                  title="Limpar dados lançados e atividades geradas para início de novo ciclo (mantém alunos, professores e equipe de apoio)"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 text-rose-600" />
+                  <span>Zerar Atividades & Lançamentos</span>
+                </button>
               </div>
             </div>
 
@@ -5693,6 +5985,107 @@ export const CoordenacaoView: React.FC<CoordenacaoViewProps> = ({
             setModalPeiInternoAberto(false);
           }}
         />
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL EXCLUSIVO DA COORDENAÇÃO: ZERAR LANÇAMENTOS E ATIVIDADES (INICIAR NOVO CICLO) */}
+      {/* ========================================================================= */}
+      {modalZerarAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden flex flex-col animate-scaleUp">
+            
+            {/* Cabeçalho do Modal */}
+            <div className="p-5 bg-rose-50 border-b border-rose-100 flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <RotateCcw className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 leading-tight">
+                    Zerar Lançamentos & Atividades Geradas
+                  </h3>
+                  <p className="text-xs text-rose-700 font-semibold mt-0.5">
+                    Ação Exclusiva da Coordenação Pedagógica
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => !isZerando && setModalZerarAberto(false)}
+                disabled={isZerando}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Conteúdo Explicativo Detalhado */}
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              <p className="text-xs text-slate-700 leading-relaxed">
+                Esta ação prepara o sistema para o <strong>início de um novo ciclo letivo</strong>. Ela limpará exclusivamente os dados lançados e as atividades geradas, reiniciando do zero a contagem e frequência dos apoios escolares e zerando os avisos de pendências anteriores.
+              </p>
+
+              {/* Box Verde de Segurança Rigorosa */}
+              <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 space-y-2">
+                <div className="flex items-center gap-2 text-emerald-900 font-black text-xs uppercase tracking-wide">
+                  <ShieldCheck className="h-4 w-4 text-emerald-700 shrink-0" />
+                  <span>Garantia de Preservação Total (Não Serão Excluídos)</span>
+                </div>
+                <ul className="text-xs text-emerald-800 space-y-1.5 font-medium pl-6 list-disc">
+                  <li><strong>Alunos Preservados:</strong> Todos os <strong>{estudantes.length} estudantes</strong> cadastrados continuam 100% intactos com suas turmas e laudos.</li>
+                  <li><strong>Professores Preservados:</strong> Todas as contas e credenciais dos <strong>{usuariosAutorizados.length} professores</strong> continuam ativas.</li>
+                  <li><strong>Profissionais de Apoio Preservados:</strong> Toda a equipe de apoio escolar (PAE) e seus vínculos permanecem preservados.</li>
+                  <li><strong>PEIs e Matrizes:</strong> Todos os Planos de Ensino Individualizado homologados e matrizes curriculares continuam salvos.</li>
+                </ul>
+              </div>
+
+              {/* Box Vermelho do que será Apagado e Zerado */}
+              <div className="p-3.5 bg-rose-50 rounded-2xl border border-rose-200 space-y-2">
+                <div className="flex items-center gap-2 text-rose-900 font-black text-xs uppercase tracking-wide">
+                  <Trash2 className="h-4 w-4 text-rose-700 shrink-0" />
+                  <span>O que será Apagado e Zerado</span>
+                </div>
+                <ul className="text-xs text-rose-800 space-y-1.5 font-medium pl-6 list-disc">
+                  <li><strong>Atividades Geradas:</strong> {atividades.length} {atividades.length === 1 ? 'atividade gerada será apagada' : 'atividades geradas serão apagadas'}.</li>
+                  <li><strong>Lançamentos do Apoio:</strong> {registrosApoio.length} {registrosApoio.length === 1 ? 'registro diário de acompanhamento será apagado' : 'registros diários de acompanhamento serão apagados'}.</li>
+                  <li><strong>Reinício da Contagem do Apoio:</strong> O contador de frequência e dias do apoio escolar será zerado, iniciando a contagem a partir de agora.</li>
+                  <li><strong>Avisos de Pendência:</strong> Notificações de atividades aguardando revisão e alertas de diários de ciclos anteriores serão zerados.</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Rodapé com Botões de Ação */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setModalZerarAberto(false)}
+                disabled={isZerando}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarZerarLancamentos}
+                disabled={isZerando}
+                className="px-5 py-2.5 rounded-xl text-xs font-extrabold text-white bg-rose-600 hover:bg-rose-700 shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer disabled:opacity-60"
+              >
+                {isZerando ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Limpando e Zerando...</span>
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="h-4 w-4" />
+                    <span>Confirmar e Zerar Lançamentos</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+          </div>
+        </div>
       )}
 
     </div>

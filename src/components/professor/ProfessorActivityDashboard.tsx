@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { 
   BarChart3, 
   FileText, 
@@ -33,6 +33,171 @@ import {
   AuthorizedUser, 
   PerfilPedagogico 
 } from '../../types';
+
+interface ItemAtividadeRowProps {
+  ativ: AtividadeAdaptada;
+  formatarDataHora: (iso: string) => string;
+  onToggleAlinhamentoPei: (ativ: AtividadeAdaptada) => void;
+  onAbrirModalNotaPei: (ativ: AtividadeAdaptada) => void;
+  onVisualizarA4: (ativ: AtividadeAdaptada) => void;
+  onRevisarQuestao: (ativ: AtividadeAdaptada) => void;
+  onNovaAtividadeParaAluno?: (estudanteId: string) => void;
+}
+
+const ItemAtividadeRow = React.memo<ItemAtividadeRowProps>(({
+  ativ,
+  formatarDataHora,
+  onToggleAlinhamentoPei,
+  onAbrirModalNotaPei,
+  onVisualizarA4,
+  onRevisarQuestao,
+  onNovaAtividadeParaAluno,
+}) => {
+  const qtdQuestoes = ativ.quantidadeQuestoes || ativ.questoes?.length || 0;
+  const isRevisada = ativ.status === 'Revisada';
+
+  return (
+    <div 
+      className="p-4 hover:bg-slate-50/80 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
+    >
+      <div className="space-y-1.5 flex-1 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-extrabold text-sm text-slate-900 truncate">
+            {ativ.conteudo}
+          </span>
+          <span className="px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200 font-bold text-[10px]">
+            {ativ.disciplina}
+          </span>
+          <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-[10px]">
+            Sala: {ativ.turma}
+          </span>
+          <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
+            isRevisada 
+              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+              : 'bg-amber-100 text-amber-800 border border-amber-200'
+          }`}>
+            {ativ.status}
+          </span>
+
+          {/* Badge / Botão Interativo de Alinhamento ao PEI */}
+          <button
+            type="button"
+            onClick={() => onToggleAlinhamentoPei(ativ)}
+            className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-all shadow-2xs ${
+              ativ.alinhadaAoPei
+                ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-950 border border-emerald-300'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300'
+            }`}
+            title={ativ.alinhadaAoPei ? 'Clique para desmarcar do PEI' : 'Clique para marcar como Alinhada ao PEI'}
+          >
+            <CheckCircle2 className={`h-3 w-3 ${ativ.alinhadaAoPei ? 'text-emerald-700' : 'text-slate-400'}`} />
+            <span>{ativ.alinhadaAoPei ? 'Alinhada ao PEI ✓' : 'Pendente PEI'}</span>
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 text-slate-600 text-xs">
+          <span>
+            Estudante: <strong>{ativ.estudanteNome}</strong>
+          </span>
+          <span>•</span>
+          {ativ.habilidadeCodigo && (
+            <>
+              <span className="font-mono text-slate-500 font-semibold">
+                Habilidade: {ativ.habilidadeCodigo}
+              </span>
+              <span>•</span>
+            </>
+          )}
+          <span>
+            {qtdQuestoes} {qtdQuestoes === 1 ? 'questão' : 'questões'} ({ativ.tipoQuestoes || 'múltipla escolha'})
+          </span>
+          <span>•</span>
+          <span className="text-slate-400 text-[11px] flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            <span>{formatarDataHora(ativ.dataCriacao)}</span>
+          </span>
+        </div>
+
+        {ativ.observacaoProfessor && (
+          <p className="text-[11px] text-slate-500 italic bg-slate-50 p-1.5 rounded border border-slate-100">
+            Obs: {ativ.observacaoProfessor}
+          </p>
+        )}
+
+        {/* Detalhamento do Alinhamento ao PEI */}
+        {ativ.alinhadaAoPei && (
+          <div className="flex flex-wrap items-center gap-2 pt-0.5">
+            <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg flex items-center gap-1.5">
+              <Check className="h-3 w-3 text-emerald-600 shrink-0" />
+              <span>PEI: {ativ.peiAlinhamentoDetalhes || `Objetivos pedagógicos e adaptações validadas para ${ativ.estudanteNome}.`}</span>
+            </span>
+            {ativ.peiAlinhadoEm && (
+              <span className="text-[10px] text-slate-400">
+                (Validado por {ativ.peiAlinhadoPor || 'Professor'} em {formatarDataHora(ativ.peiAlinhadoEm)})
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => onAbrirModalNotaPei(ativ)}
+              className="text-[10px] text-sky-700 hover:text-sky-900 font-bold underline cursor-pointer"
+            >
+              Editar nota PEI
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Ações da Atividade */}
+      <div className="flex items-center gap-2 self-start md:self-center shrink-0 flex-wrap">
+        <button
+          type="button"
+          onClick={() => onToggleAlinhamentoPei(ativ)}
+          className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs ${
+            ativ.alinhadaAoPei
+              ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
+              : 'bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300'
+          }`}
+          title={ativ.alinhadaAoPei ? 'Clique para desmarcar do PEI' : 'Clique para marcar esta atividade como Alinhada ao PEI'}
+        >
+          <CheckCircle2 className={`h-3.5 w-3.5 ${ativ.alinhadaAoPei ? 'text-emerald-200' : 'text-emerald-600'}`} />
+          <span>{ativ.alinhadaAoPei ? 'Alinhada ao PEI ✓' : 'Marcar PEI'}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onVisualizarA4(ativ)}
+          className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
+          title="Visualizar e imprimir Folha A4 oficial"
+        >
+          <Printer className="h-3.5 w-3.5 text-emerald-700" />
+          <span>Folha A4</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onRevisarQuestao(ativ)}
+          className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+          title="Revisar enunciados e alternativas"
+        >
+          <Edit2 className="h-3.5 w-3.5 text-slate-600" />
+          <span>Revisar</span>
+        </button>
+
+        {onNovaAtividadeParaAluno && (
+          <button
+            type="button"
+            onClick={() => onNovaAtividadeParaAluno(ativ.estudanteId)}
+            className="px-2.5 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+            title="Criar nova adaptação para este estudante"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Nova p/ Aluno</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+});
+ItemAtividadeRow.displayName = 'ItemAtividadeRow';
 
 interface ProfessorActivityDashboardProps {
   atividades: AtividadeAdaptada[];
@@ -147,7 +312,7 @@ export const ProfessorActivityDashboard: React.FC<ProfessorActivityDashboardProp
   }, [atividadesDoProfessor]);
 
   // Função para marcar/desmarcar atividade como Alinhada ao PEI
-  const handleToggleAlinhamentoPei = (ativ: AtividadeAdaptada) => {
+  const handleToggleAlinhamentoPei = useCallback((ativ: AtividadeAdaptada) => {
     const novoStatus = !ativ.alinhadaAoPei;
     const agora = new Date().toISOString();
     const professorNome = currentUser?.name || ativ.professorNome || 'Professor Regente';
@@ -175,7 +340,12 @@ export const ProfessorActivityDashboard: React.FC<ProfessorActivityDashboardProp
     setTimeout(() => {
       setFeedbackPei(null);
     }, 3500);
-  };
+  }, [currentUser, onAtualizarAtividade]);
+
+  const handleAbrirModalNotaPei = useCallback((ativ: AtividadeAdaptada) => {
+    setModalNotaPeiAtiv(ativ);
+    setNotaPeiEditando(ativ.peiAlinhamentoDetalhes || `Atividade alinhada aos objetivos e adaptações do PEI de ${ativ.estudanteNome}.`);
+  }, []);
 
   // Lista de disciplinas e turmas para os selects de filtro
   const disciplinasDisponiveis = useMemo(() => {
@@ -645,156 +815,18 @@ export const ProfessorActivityDashboard: React.FC<ProfessorActivityDashboardProp
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {atividadesFiltradas.map((ativ) => {
-              const qtdQuestoes = ativ.quantidadeQuestoes || ativ.questoes?.length || 0;
-              const isRevisada = ativ.status === 'Revisada';
-
-              return (
-                <div 
-                  key={ativ.id} 
-                  className="p-4 hover:bg-slate-50/80 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs"
-                >
-                  <div className="space-y-1.5 flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-extrabold text-sm text-slate-900 truncate">
-                        {ativ.conteudo}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-sky-50 text-sky-800 border border-sky-200 font-bold text-[10px]">
-                        {ativ.disciplina}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-semibold text-[10px]">
-                        Sala: {ativ.turma}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                        isRevisada 
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                          : 'bg-amber-100 text-amber-800 border border-amber-200'
-                      }`}>
-                        {ativ.status}
-                      </span>
-
-                      {/* Badge / Botão Interativo de Alinhamento ao PEI */}
-                      <button
-                        type="button"
-                        onClick={() => handleToggleAlinhamentoPei(ativ)}
-                        className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] flex items-center gap-1 cursor-pointer transition-all shadow-2xs ${
-                          ativ.alinhadaAoPei
-                            ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-950 border border-emerald-300'
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300'
-                        }`}
-                        title={ativ.alinhadaAoPei ? 'Clique para desmarcar do PEI' : 'Clique para marcar como Alinhada ao PEI'}
-                      >
-                        <CheckCircle2 className={`h-3 w-3 ${ativ.alinhadaAoPei ? 'text-emerald-700' : 'text-slate-400'}`} />
-                        <span>{ativ.alinhadaAoPei ? 'Alinhada ao PEI ✓' : 'Pendente PEI'}</span>
-                      </button>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 text-slate-600 text-xs">
-                      <span>
-                        Estudante: <strong>{ativ.estudanteNome}</strong>
-                      </span>
-                      <span>•</span>
-                      {ativ.habilidadeCodigo && (
-                        <>
-                          <span className="font-mono text-slate-500 font-semibold">
-                            Habilidade: {ativ.habilidadeCodigo}
-                          </span>
-                          <span>•</span>
-                        </>
-                      )}
-                      <span>
-                        {qtdQuestoes} {qtdQuestoes === 1 ? 'questão' : 'questões'} ({ativ.tipoQuestoes || 'múltipla escolha'})
-                      </span>
-                      <span>•</span>
-                      <span className="text-slate-400 text-[11px] flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        <span>{formatarDataHora(ativ.dataCriacao)}</span>
-                      </span>
-                    </div>
-
-                    {ativ.observacaoProfessor && (
-                      <p className="text-[11px] text-slate-500 italic bg-slate-50 p-1.5 rounded border border-slate-100">
-                        Obs: {ativ.observacaoProfessor}
-                      </p>
-                    )}
-
-                    {/* Detalhamento do Alinhamento ao PEI */}
-                    {ativ.alinhadaAoPei && (
-                      <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                        <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg flex items-center gap-1.5">
-                          <Check className="h-3 w-3 text-emerald-600 shrink-0" />
-                          <span>PEI: {ativ.peiAlinhamentoDetalhes || `Objetivos pedagógicos e adaptações validadas para ${ativ.estudanteNome}.`}</span>
-                        </span>
-                        {ativ.peiAlinhadoEm && (
-                          <span className="text-[10px] text-slate-400">
-                            (Validado por {ativ.peiAlinhadoPor || 'Professor'} em {formatarDataHora(ativ.peiAlinhadoEm)})
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setModalNotaPeiAtiv(ativ);
-                            setNotaPeiEditando(ativ.peiAlinhamentoDetalhes || `Atividade alinhada aos objetivos e adaptações do PEI de ${ativ.estudanteNome}.`);
-                          }}
-                          className="text-[10px] text-sky-700 hover:text-sky-900 font-bold underline cursor-pointer"
-                        >
-                          Editar nota PEI
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Ações da Atividade */}
-                  <div className="flex items-center gap-2 self-start md:self-center shrink-0 flex-wrap">
-                    {/* Botão de Toggle PEI Rápido */}
-                    <button
-                      type="button"
-                      onClick={() => handleToggleAlinhamentoPei(ativ)}
-                      className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-2xs ${
-                        ativ.alinhadaAoPei
-                          ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                          : 'bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300'
-                      }`}
-                      title={ativ.alinhadaAoPei ? 'Clique para desmarcar do PEI' : 'Clique para marcar esta atividade como Alinhada ao PEI'}
-                    >
-                      <CheckCircle2 className={`h-3.5 w-3.5 ${ativ.alinhadaAoPei ? 'text-emerald-200' : 'text-emerald-600'}`} />
-                      <span>{ativ.alinhadaAoPei ? 'Alinhada ao PEI ✓' : 'Marcar PEI'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onVisualizarA4(ativ)}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs"
-                      title="Visualizar e imprimir Folha A4 oficial"
-                    >
-                      <Printer className="h-3.5 w-3.5 text-emerald-700" />
-                      <span>Folha A4</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => onRevisarQuestao(ativ)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                      title="Revisar enunciados e alternativas"
-                    >
-                      <Edit2 className="h-3.5 w-3.5 text-slate-600" />
-                      <span>Revisar</span>
-                    </button>
-
-                    {onNovaAtividadeParaAluno && (
-                      <button
-                        type="button"
-                        onClick={() => onNovaAtividadeParaAluno(ativ.estudanteId)}
-                        className="px-2.5 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
-                        title="Criar nova adaptação para este estudante"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Nova p/ Aluno</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {atividadesFiltradas.map((ativ) => (
+              <ItemAtividadeRow
+                key={ativ.id}
+                ativ={ativ}
+                formatarDataHora={formatarDataHora}
+                onToggleAlinhamentoPei={handleToggleAlinhamentoPei}
+                onAbrirModalNotaPei={handleAbrirModalNotaPei}
+                onVisualizarA4={onVisualizarA4}
+                onRevisarQuestao={onRevisarQuestao}
+                onNovaAtividadeParaAluno={onNovaAtividadeParaAluno}
+              />
+            ))}
           </div>
         )}
 

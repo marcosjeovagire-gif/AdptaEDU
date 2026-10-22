@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Sliders, 
   Printer, 
@@ -39,10 +39,71 @@ import { buildActivityContext } from '../../server/pedagogicalContextService';
 import { consultarMatriz } from '../../data/matrizesOficiaisSeduc2026';
 import { A4SheetPreview } from '../a4/A4SheetPreview';
 import { ProfessorActivityDashboard } from './ProfessorActivityDashboard';
+import { DashboardView } from './DashboardView';
 import { baixarRelatorioConsolidadoEstudantePdf } from '../../services/relatorioConsolidadoService';
 import { obterTodosPeis } from '../../services/peiService';
 
-export type EtapaProfessor = 'dashboard' | 'formulario' | 'validar_contexto' | 'revisar' | 'folha_a4';
+export type EtapaProfessor = 'dashboard' | 'atividades_lista' | 'formulario' | 'validar_contexto' | 'revisar' | 'folha_a4';
+
+// Componente memoizado para itens da lista lateral de atividades criadas
+interface AtividadeMiniCardProps {
+  ativ: AtividadeAdaptada;
+  onSelecionar: (ativ: AtividadeAdaptada) => void;
+}
+
+const AtividadeMiniCard = React.memo<AtividadeMiniCardProps>(({ ativ, onSelecionar }) => {
+  return (
+    <div
+      onClick={() => onSelecionar(ativ)}
+      className="p-3 border border-slate-200 rounded-xl text-xs hover:bg-slate-50 cursor-pointer transition-colors"
+    >
+      <div className="flex items-center justify-between mb-1">
+        <span className="font-bold text-slate-800 truncate">{ativ.conteudo}</span>
+        <div className="flex items-center gap-1">
+          {ativ.alinhadaAoPei && (
+            <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-300" title="Alinhada ao PEI">
+              PEI ✓
+            </span>
+          )}
+          <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">{ativ.turma}</span>
+        </div>
+      </div>
+      <p className="text-slate-500 text-[11px]">Aluno: {ativ.estudanteNome}</p>
+      <span className="text-[10px] text-emerald-700 font-semibold mt-1 inline-block">
+        Ver folha A4 →
+      </span>
+    </div>
+  );
+});
+AtividadeMiniCard.displayName = 'AtividadeMiniCard';
+
+// Componente memoizado para cada questão na etapa de revisão
+interface QuestaoRevisaoItemProps {
+  questao: QuestaoAdaptada;
+  onEdit: (questao: QuestaoAdaptada) => void;
+}
+
+const QuestaoRevisaoItem = React.memo<QuestaoRevisaoItemProps>(({ questao, onEdit }) => {
+  return (
+    <div className="p-4 border border-slate-200 rounded-xl bg-slate-50 space-y-2 text-xs">
+      <span className="font-bold text-slate-800">Questão {questao.numero} ({questao.tipo}):</span>
+      <textarea
+        rows={2}
+        value={questao.enunciado}
+        onChange={(e) => onEdit({ ...questao, enunciado: e.target.value })}
+        className="w-full p-2 border rounded bg-white text-xs"
+      />
+      {questao.alternativas && (
+        <div className="space-y-1 pl-2">
+          {questao.alternativas.map((alt, idx) => (
+            <p key={idx} className="text-slate-700 font-mono text-[11px]">{alt}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+QuestaoRevisaoItem.displayName = 'QuestaoRevisaoItem';
 
 export interface ProfessorViewProps {
   currentUser: AuthorizedUser | null;
@@ -229,22 +290,31 @@ export const ProfessorView: React.FC<ProfessorViewProps> = ({
     }
   }, [initialEtapa]);
 
-  // Filtrar apenas estudantes ativos vinculados ao UID ou ID do professor
-  const estudantesAutorizados = estudantes.filter((est) => {
-    if (est.situacao !== 'ativo') return false;
-    if (!currentUser) return true;
-    if (est.professoresAutorizadosIds && est.professoresAutorizadosIds.length > 0) {
-      return est.professoresAutorizadosIds.includes(currentUser.id) || 
-             (currentUser.uid && est.professoresAutorizadosIds.includes(currentUser.uid));
-    }
-    return true;
-  });
+  // Filtrar apenas estudantes ativos vinculados ao UID ou ID do professor (memoizado)
+  const estudantesAutorizados = useMemo(() => {
+    return estudantes.filter((est) => {
+      if (est.situacao !== 'ativo') return false;
+      if (!currentUser) return true;
+      if (est.professoresAutorizadosIds && est.professoresAutorizadosIds.length > 0) {
+        return est.professoresAutorizadosIds.includes(currentUser.id) || 
+               (currentUser.uid && est.professoresAutorizadosIds.includes(currentUser.uid));
+      }
+      return true;
+    });
+  }, [estudantes, currentUser]);
 
-  const estudanteSelecionado = estudantes.find(e => e.id === estudanteId);
-  const perfilAutorizado = perfisPedagogicos.find(p => p.estudanteId === estudanteId && p.status === 'aprovado');
+  const estudanteSelecionado = useMemo(() => {
+    return estudantes.find(e => e.id === estudanteId);
+  }, [estudantes, estudanteId]);
 
-  // Recupera automaticamente a série do estudante (Seção 18)
-  const serieEstudante = estudanteSelecionado?.anoSerie || estudanteSelecionado?.turma?.split(' ')[0] || '';
+  const perfilAutorizado = useMemo(() => {
+    return perfisPedagogicos.find(p => p.estudanteId === estudanteId && p.status === 'aprovado');
+  }, [perfisPedagogicos, estudanteId]);
+
+  // Recupera automaticamente a série do estudante (Seção 18 - memoizado)
+  const serieEstudante = useMemo(() => {
+    return estudanteSelecionado?.anoSerie || estudanteSelecionado?.turma?.split(' ')[0] || '';
+  }, [estudanteSelecionado]);
 
   // Filtra matrizes aprovadas da série do estudante e disciplina selecionada
   const matrizesFiltradas = useMemo(() => {
@@ -335,13 +405,17 @@ export const ProfessorView: React.FC<ProfessorViewProps> = ({
     return Array.from(mapa.values());
   }, [habilidadesCurriculares, habilidadesAprovadas, disciplina, serieEstudante]);
 
-  // Habilidade selecionada
-  const habilidadeSelecionada = habilidadesFiltradas.find(h => 
-    h.id === habilidadeId || ('skillCode' in h && h.skillCode === habilidadeId) || ('codigo' in h && h.codigo === habilidadeId)
-  );
+  // Habilidade selecionada (memoizado)
+  const habilidadeSelecionada = useMemo(() => {
+    return habilidadesFiltradas.find(h => 
+      h.id === habilidadeId || ('skillCode' in h && h.skillCode === habilidadeId) || ('codigo' in h && h.codigo === habilidadeId)
+    );
+  }, [habilidadesFiltradas, habilidadeId]);
 
-  // Minhas atividades (criadas por este professor)
-  const minhasAtividades = atividades.filter(a => !currentUser || a.professorId === currentUser.id || a.professorId === currentUser.uid);
+  // Minhas atividades (criadas por este professor - memoizado)
+  const minhasAtividades = useMemo(() => {
+    return atividades.filter(a => !currentUser || a.professorId === currentUser.id || a.professorId === currentUser.uid);
+  }, [atividades, currentUser]);
 
   // Validação do contexto antes de prosseguir (Seção 20)
   const handleValidarContexto = () => {
@@ -450,6 +524,8 @@ export const ProfessorView: React.FC<ProfessorViewProps> = ({
         : 'multipla_escolha',
       estiloTipograficoVisual,
       estiloDesenho,
+      formatoLetra: (estiloTipograficoVisual === 'letra_bastao' || estiloTipograficoVisual === 'letra_bastao_desenho_matriz' || estiloTipograficoVisual === 'so_desenhos') ? 'bastao' : 'cursiva',
+      usarCaixaAlta: (estiloTipograficoVisual === 'letra_bastao' || estiloTipograficoVisual === 'letra_bastao_desenho_matriz' || estiloTipograficoVisual === 'so_desenhos'),
       apoioVisual: (estiloTipograficoVisual === 'so_desenhos' || estiloTipograficoVisual === 'letra_bastao_desenho_matriz') ? {
         habilitado: true,
         tipo: estiloTipograficoVisual === 'so_desenhos' ? 'desenhos' : (estiloDesenho === 'preto_e_branco_colorir' ? 'colorir' : 'desenhos'),
@@ -530,13 +606,20 @@ export const ProfessorView: React.FC<ProfessorViewProps> = ({
     }, 3500);
   };
 
-  const handleEditQuestao = (questaoAtualizada: QuestaoAdaptada) => {
-    if (!atividadeAtiva) return;
-    const novas = atividadeAtiva.questoes.map(q => q.id === questaoAtualizada.id ? questaoAtualizada : q);
-    const atualizada = { ...atividadeAtiva, questoes: novas, status: 'Revisada' as const };
-    setAtividadeAtiva(atualizada);
-    onAtualizarAtividade(atualizada);
-  };
+  const handleEditQuestao = useCallback((questaoAtualizada: QuestaoAdaptada) => {
+    setAtividadeAtiva((prev) => {
+      if (!prev) return null;
+      const novas = prev.questoes.map(q => q.id === questaoAtualizada.id ? questaoAtualizada : q);
+      const atualizada = { ...prev, questoes: novas, status: 'Revisada' as const };
+      onAtualizarAtividade(atualizada);
+      return atualizada;
+    });
+  }, [onAtualizarAtividade]);
+
+  const handleSelecionarAtividadeMini = useCallback((ativ: AtividadeAdaptada) => {
+    setAtividadeAtiva(ativ);
+    setEtapa('folha_a4');
+  }, []);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -613,9 +696,19 @@ export const ProfessorView: React.FC<ProfessorViewProps> = ({
               }`}
             >
               <BarChart3 className="h-4 w-4" />
-              <span>Painel & Estatísticas</span>
+              <span>Dashboard Analítico</span>
+            </button>
+
+            <button
+              onClick={() => setEtapa('atividades_lista')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-colors ${
+                etapa === 'atividades_lista' ? 'bg-sky-700 text-white shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              <span>Atividades Cadastradas</span>
               <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                etapa === 'dashboard' ? 'bg-sky-900 text-white' : 'bg-slate-200 text-slate-800'
+                etapa === 'atividades_lista' ? 'bg-sky-900 text-white' : 'bg-slate-200 text-slate-800'
               }`}>
                 {atividades.length}
               </span>
@@ -668,8 +761,30 @@ export const ProfessorView: React.FC<ProfessorViewProps> = ({
             )}
           </div>
 
-          {/* ETAPA 0: PAINEL & RESUMO DE ATIVIDADES (SUMMARY DASHBOARD) */}
+          {/* ETAPA 0: DASHBOARD ANALÍTICO (RECHARTS, SELETOR DE DATAS, TURMAS E PDF) */}
           {etapa === 'dashboard' && (
+            <DashboardView
+              atividades={atividades}
+              estudantes={estudantesAutorizados}
+              perfisPedagogicos={perfisPedagogicos}
+              registrosApoio={registrosApoio}
+              currentUser={currentUser}
+              escolaConfig={escolaConfig}
+              onCriarAtividade={(alunoId) => {
+                if (alunoId) setEstudanteId(alunoId);
+                setEtapa('formulario');
+              }}
+              onVisualizarA4={(ativ) => {
+                setAtividadeAtiva(ativ);
+                setEtapa('folha_a4');
+                if (onVisualizarAtividadeA4) onVisualizarAtividadeA4(ativ);
+              }}
+              onIrParaListaAtividades={() => setEtapa('atividades_lista')}
+            />
+          )}
+
+          {/* ETAPA 0B: LISTA E GERENCIADOR DE ATIVIDADES (PROFESSOR ACTIVITY DASHBOARD) */}
+          {etapa === 'atividades_lista' && (
             <ProfessorActivityDashboard
               atividades={atividades}
               currentUser={currentUser}
@@ -1222,30 +1337,11 @@ export const ProfessorView: React.FC<ProfessorViewProps> = ({
                   ) : (
                     <div className="space-y-2 max-h-96 overflow-y-auto">
                       {minhasAtividades.map((ativ) => (
-                        <div
+                        <AtividadeMiniCard
                           key={ativ.id}
-                          onClick={() => {
-                            setAtividadeAtiva(ativ);
-                            setEtapa('folha_a4');
-                          }}
-                          className="p-3 border border-slate-200 rounded-xl text-xs hover:bg-slate-50 cursor-pointer transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-bold text-slate-800 truncate">{ativ.conteudo}</span>
-                            <div className="flex items-center gap-1">
-                              {ativ.alinhadaAoPei && (
-                                <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-300" title="Alinhada ao PEI">
-                                  PEI ✓
-                                </span>
-                              )}
-                              <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">{ativ.turma}</span>
-                            </div>
-                          </div>
-                          <p className="text-slate-500 text-[11px]">Aluno: {ativ.estudanteNome}</p>
-                          <span className="text-[10px] text-emerald-700 font-semibold mt-1 inline-block">
-                            Ver folha A4 →
-                          </span>
-                        </div>
+                          ativ={ativ}
+                          onSelecionar={handleSelecionarAtividadeMini}
+                        />
                       ))}
                     </div>
                   )}
@@ -1329,22 +1425,11 @@ export const ProfessorView: React.FC<ProfessorViewProps> = ({
 
               <div className="space-y-4">
                 {atividadeAtiva.questoes.map((q) => (
-                  <div key={q.id} className="p-4 border border-slate-200 rounded-xl bg-slate-50 space-y-2 text-xs">
-                    <span className="font-bold text-slate-800">Questão {q.numero} ({q.tipo}):</span>
-                    <textarea
-                      rows={2}
-                      value={q.enunciado}
-                      onChange={(e) => handleEditQuestao({ ...q, enunciado: e.target.value })}
-                      className="w-full p-2 border rounded bg-white text-xs"
-                    />
-                    {q.alternativas && (
-                      <div className="space-y-1 pl-2">
-                        {q.alternativas.map((alt, idx) => (
-                          <p key={idx} className="text-slate-700 font-mono text-[11px]">{alt}</p>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <QuestaoRevisaoItem
+                    key={q.id}
+                    questao={q}
+                    onEdit={handleEditQuestao}
+                  />
                 ))}
               </div>
             </div>

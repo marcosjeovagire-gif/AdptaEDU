@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { 
   UserRole, 
   AuthorizedUser,
@@ -26,17 +26,20 @@ import { gerarUsuariosIniciaisAutorizadosDoPdf, normalizeEmail } from './data/pd
 import { MATRIZES_CURRICULARES_INICIAIS, HABILIDADES_CURRICULARES_INICIAIS } from './server/curriculumMatrixService';
 import { Header } from './components/Header';
 import { LoginView } from './components/LoginView';
-import { CoordenacaoView, AbaCoordenacao } from './components/coordenacao/CoordenacaoView';
-import { ProfessorView } from './components/professor/ProfessorView';
-import { ProfissionalApoioView } from './components/apoio/ProfissionalApoioView';
-import { MasterDataCenterView } from './components/master/MasterDataCenterView';
-import { ImportarMatrizModal } from './components/coordenacao/ImportarMatrizModal';
-import { PeiGeneratorModal } from './components/pei/PeiGeneratorModal';
+import type { AbaCoordenacao } from './components/coordenacao/CoordenacaoView';
 import { sanitizarNomeArquivoPei } from './services/peiPdfService';
 import { obterTodosPeis } from './services/peiService';
-import { A4SheetPreview } from './components/a4/A4SheetPreview';
-import { GoogleDriveManagerModal } from './components/common/GoogleDriveManagerModal';
 import { isGoogleDriveConnected, initGoogleDriveAuth, iniciarServicoBackupPeriodico } from './services/googleDriveService';
+
+// Code-Splitting e Otimização de Performance via React.lazy & Dynamic Import()
+const CoordenacaoView = React.lazy(() => import('./components/coordenacao/CoordenacaoView').then(m => ({ default: m.CoordenacaoView })));
+const ProfessorView = React.lazy(() => import('./components/professor/ProfessorView').then(m => ({ default: m.ProfessorView })));
+const ProfissionalApoioView = React.lazy(() => import('./components/apoio/ProfissionalApoioView').then(m => ({ default: m.ProfissionalApoioView })));
+const MasterDataCenterView = React.lazy(() => import('./components/master/MasterDataCenterView').then(m => ({ default: m.MasterDataCenterView })));
+const ImportarMatrizModal = React.lazy(() => import('./components/coordenacao/ImportarMatrizModal').then(m => ({ default: m.ImportarMatrizModal })));
+const PeiGeneratorModal = React.lazy(() => import('./components/pei/PeiGeneratorModal').then(m => ({ default: m.PeiGeneratorModal })));
+const A4SheetPreview = React.lazy(() => import('./components/a4/A4SheetPreview').then(m => ({ default: m.A4SheetPreview })));
+const GoogleDriveManagerModal = React.lazy(() => import('./components/common/GoogleDriveManagerModal').then(m => ({ default: m.GoogleDriveManagerModal })));
 import { 
   migrarLocalStorageParaIndexedDbSeNecessario,
   salvarRegistroApoioIdb,
@@ -47,11 +50,22 @@ import {
   salvarTodosRegistrosApoioIdb,
   obterTodosRegistrosApoioIdb,
   obterEstudantesIdb,
-  obterAtividadesIdb
+  obterAtividadesIdb,
+  zerarLancamentosEAtividadesIdb
 } from './services/indexedDbService';
 import { 
   iniciarMonitoramentoSincronizacao 
 } from './services/offlineSyncService';
+import { 
+  salvarAtividadeNoFirestore, 
+  salvarRegistroApoioNoFirestore, 
+  salvarPeiNoFirestore,
+  excluirTodasAtividadesDoFirestore,
+  excluirTodosRegistrosApoioDoFirestore,
+  ouvirAtividadesDoFirestore,
+  ouvirRegistrosApoioDoFirestore,
+  ouvirPeisDoFirestore 
+} from './services/escolaFirestoreService';
 import { 
   registrarServiceWorker 
 } from './services/pushNotificationService';
@@ -69,6 +83,26 @@ import {
   validateAndSanitizeEscolaConfig
 } from './utils/typeValidators';
 import { X, ShieldAlert, ArrowLeft } from 'lucide-react';
+
+// Fallback de carregamento visual para Views e Módulos carregados via React.lazy
+const ViewLoadingFallback: React.FC<{ message?: string }> = ({ message = 'Carregando módulo pedagógico...' }) => (
+  <div className="flex flex-col items-center justify-center min-h-[45vh] p-8 text-center space-y-4">
+    <div className="h-10 w-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+    <p className="text-xs font-bold text-slate-700 tracking-wide uppercase">{message}</p>
+    <span className="text-[11px] text-slate-400 font-medium">AdaptaEdu Escolar • SEDUC-GO</span>
+  </div>
+);
+
+// Fallback de carregamento para Modais dinâmicos sob demanda
+const ModalLoadingFallback: React.FC<{ title?: string }> = ({ title = 'Carregando recurso...' }) => (
+  <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div className="bg-white rounded-2xl p-6 shadow-xl flex flex-col items-center space-y-3 max-w-sm w-full border border-slate-200">
+      <div className="h-8 w-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+      <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">{title}</p>
+      <span className="text-[10px] text-slate-400">Carregando módulo sob demanda...</span>
+    </div>
+  </div>
+);
 
 export default function App() {
   // 1. Sessão Local Controlada (não guarda permanentemente no localStorage)
@@ -380,6 +414,11 @@ export default function App() {
       resultado: 'Sucesso',
       detalhes: `Criação e homologação do PEI oficial (SEDUC-GO / SIAP) para o estudante ${novoPei.studentName} (${novoPei.period}).`,
     });
+
+    // Sincronização em Nuvem (Cloud Firestore) com tolerância a offline
+    salvarPeiNoFirestore(novoPei).catch(e => {
+      console.warn('Falha na sincronização do PEI no Firestore (armazenado localmente):', e);
+    });
   };
 
   // Monitora conexão com o Google Drive
@@ -447,6 +486,30 @@ export default function App() {
       pararMonitoramentoSync();
       window.removeEventListener('adaptaedu:registro_sincronizado', handleRegistroSincronizado);
       window.removeEventListener('adaptaedu:atividade_sincronizada', handleAtividadeSincronizada);
+    };
+  }, []);
+
+  // Sincronização em Tempo Real com Cloud Firestore para múltiplos dispositivos e celulares
+  useEffect(() => {
+    const unsubAtiv = ouvirAtividadesDoFirestore((novasAtivs) => {
+      setAtividades(prev => {
+        const mapa = new Map(prev.map(a => [a.id, a]));
+        novasAtivs.forEach(a => mapa.set(a.id, a));
+        return Array.from(mapa.values());
+      });
+    });
+
+    const unsubApoio = ouvirRegistrosApoioDoFirestore((novosRegs) => {
+      setRegistrosApoio(prev => {
+        const mapa = new Map(prev.map(r => [r.id, r]));
+        novosRegs.forEach(r => mapa.set(r.id, r));
+        return Array.from(mapa.values());
+      });
+    });
+
+    return () => {
+      unsubAtiv();
+      unsubApoio();
     };
   }, []);
 
@@ -585,11 +648,7 @@ export default function App() {
     const validado = validateAndSanitizeRegistroApoio(novoOuAtualizado);
     if (!validado) return;
 
-    // Salva no IndexedDB imediatamente com suporte a status offline/online
-    salvarRegistroApoioIdb(validado, typeof navigator !== 'undefined' && !navigator.onLine).catch(e => {
-      console.warn('Erro ao salvar registro de apoio no IndexedDB:', e);
-    });
-
+    // Atualização otimista no estado da UI
     setRegistrosApoio(prev => {
       const idx = prev.findIndex(r => r.id === validado.id || (r.studentId === validado.studentId && r.data === validado.data));
       if (idx >= 0) {
@@ -598,6 +657,16 @@ export default function App() {
         return copy;
       }
       return [validado, ...prev];
+    });
+
+    // Salva no IndexedDB imediatamente com suporte a status offline/online
+    salvarRegistroApoioIdb(validado, typeof navigator !== 'undefined' && !navigator.onLine).catch(e => {
+      console.warn('Erro ao salvar registro de apoio no IndexedDB:', e);
+    });
+
+    // Sincroniza no Cloud Firestore
+    salvarRegistroApoioNoFirestore(validado).catch(e => {
+      console.warn('Falha ao salvar registro de apoio no Firestore (mantido localmente):', e);
     });
   };
 
@@ -711,6 +780,64 @@ export default function App() {
     registrarHistorico('Restauração de Estudantes', `Relação oficial de ${oficiais.length} estudantes e 18 salas restaurada a partir do documento PDF.`);
   };
 
+  /**
+   * Zera estritamente os lançamentos diários do apoio e as atividades geradas,
+   * reiniciando a contagem do apoio para um novo ciclo letivo.
+   * PRESERVA RIGOROSAMENTE: Alunos, Professores, Profissionais de Apoio, Matrizes e Configurações.
+   */
+  const handleZerarLancamentosEAtividades = async () => {
+    const qtdAtividades = atividades.length;
+    const qtdRegistrosApoio = registrosApoio.length;
+    const agoraTs = Date.now();
+
+    // 1. Zera atividades geradas em memória e no localStorage
+    setAtividades([]);
+    localStorage.setItem('adaptaedu_atividades', JSON.stringify([]));
+
+    // 2. Zera lançamentos diários do apoio e reinicia a contagem em memória e no localStorage
+    setRegistrosApoio([]);
+    localStorage.setItem('adaptaedu_registros_apoio', JSON.stringify([]));
+
+    // 3. Marca timestamp do novo ciclo de contagem e limpa avisos de pendência
+    localStorage.setItem('adaptaedu_ciclo_apoio_iniciado', agoraTs.toString());
+    localStorage.setItem('adaptaedu_lembretes_limpos_em', agoraTs.toString());
+
+    // 4. Limpa IndexedDB para atividades e registros de apoio
+    await zerarLancamentosEAtividadesIdb().catch(err => {
+      console.warn('Aviso ao zerar IndexedDB:', err);
+    });
+
+    // 5. Limpa Firestore em nuvem para atividades e registros de apoio
+    excluirTodasAtividadesDoFirestore().catch(() => {});
+    excluirTodosRegistrosApoioDoFirestore().catch(() => {});
+
+    // 6. Registra no histórico e na auditoria oficial da Coordenação
+    registrarHistorico(
+      'Ciclo Reiniciado',
+      `Coordenação zerou ${qtdAtividades} atividades geradas e ${qtdRegistrosApoio} lançamentos diários do apoio. Cadastro de estudantes, professores e equipe de apoio foi 100% preservado.`
+    );
+
+    handleAddAuditoria({
+      id: `aud-zerar-ciclo-${agoraTs}`,
+      dataHora: new Date().toLocaleString('pt-BR'),
+      usuarioResponsavel: currentUser?.name || 'Coordenação Pedagógica',
+      usuarioAlterado: 'Lançamentos & Atividades',
+      perfisAnteriores: currentUser?.roles || [],
+      perfisPosteriores: currentUser?.roles || [],
+      situacaoAnterior: `${qtdAtividades} atividades, ${qtdRegistrosApoio} diários`,
+      situacaoPosterior: '0 atividades, 0 diários (Ciclo Zerado)',
+      resultado: 'Sucesso',
+      detalhes: 'Zerar lançamentos diários e atividades geradas para início de novo ciclo de contagem do apoio. Alunos, professores e profissionais de apoio foram estritamente preservados.',
+    });
+
+    // 7. Notifica outros componentes via evento global
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('adaptaedu:lancamentos_zerados', {
+        detail: { timestamp: agoraTs }
+      }));
+    }
+  };
+
   const handleUpdateEstudante = (atualizado: Estudante) => {
     const validado = validateAndSanitizeEstudante(atualizado);
     if (!validado) return;
@@ -743,14 +870,40 @@ export default function App() {
   const handleSalvarAtividade = (nova: AtividadeAdaptada) => {
     const validada = validateAndSanitizeAtividade(nova);
     if (!validada) return;
+
+    // 1. Atualização Otimista no Estado
     setAtividades(prev => [validada, ...prev]);
+
+    // 2. Persistência Offline-First garantida no IndexedDB
+    salvarAtividadeIdb(validada, typeof navigator !== 'undefined' && !navigator.onLine).catch(e => {
+      console.warn('Erro ao salvar atividade no IndexedDB:', e);
+    });
+
+    // 3. Sincronização em Nuvem no Cloud Firestore (/activities)
+    salvarAtividadeNoFirestore(validada).catch(e => {
+      console.warn('Falha na sincronização imediata no Firestore (mantida em cache local):', e);
+    });
+
     registrarHistorico('Geração de Atividade', `Atividade ${validada.conteudo} gerada.`);
   };
 
   const handleAtualizarAtividade = (atualizada: AtividadeAdaptada) => {
     const validada = validateAndSanitizeAtividade(atualizada);
     if (!validada) return;
+
+    // 1. Atualização Otimista no Estado
     setAtividades(prev => prev.map(a => a.id === validada.id ? validada : a));
+
+    // 2. Persistência Offline-First no IndexedDB
+    salvarAtividadeIdb(validada, typeof navigator !== 'undefined' && !navigator.onLine).catch(e => {
+      console.warn('Erro ao atualizar atividade no IndexedDB:', e);
+    });
+
+    // 3. Sincronização em Nuvem no Cloud Firestore
+    salvarAtividadeNoFirestore(validada).catch(e => {
+      console.warn('Falha na sincronização de atualização no Firestore:', e);
+    });
+
     registrarHistorico('Revisão de Atividade', `Atividade ${validada.id} revisada.`);
   };
 
@@ -931,180 +1084,191 @@ export default function App() {
 
       {/* Roteamento Seguro baseado nos Papéis Reais */}
       <main className="pb-16">
-        {isMasterDataCenterActive && Boolean(currentUser?.roles?.includes('superadmin') || currentUser?.roles?.includes('developer')) ? (
-          <MasterDataCenterView
-            currentUser={currentUser}
-            usuariosAutorizados={Array.isArray(usuariosAutorizados) ? usuariosAutorizados : []}
-            onUpdateUsuarios={setUsuariosAutorizados}
-            estudantes={Array.isArray(estudantes) ? estudantes : []}
-            onUpdateEstudantes={(novos) => setEstudantes(novos)}
-            matrizes={Array.isArray(matrizesCurriculares) ? matrizesCurriculares : []}
-            habilidades={Array.isArray(curriculumSkills) ? curriculumSkills : []}
-            perfis={Array.isArray(perfisPedagogicos) ? perfisPedagogicos : []}
-            documentos={Array.isArray(documentos) ? documentos : []}
-            atividades={Array.isArray(atividades) ? atividades : []}
-            auditoria={Array.isArray(auditoria) ? auditoria : []}
-            escolaConfig={escolaConfig}
-            onUpdateEscolaConfig={setEscolaConfig}
-            onVoltarParaCoordenacao={() => setIsMasterDataCenterActive(false)}
-            onAddAuditoria={handleAddAuditoria}
-          />
-        ) : isCoordinatorActive ? (
-          <CoordenacaoView
-            currentUser={currentUser}
-            escolaConfig={escolaConfig}
-            onUpdateEscolaConfig={setEscolaConfig}
-            estudantes={Array.isArray(estudantes) ? estudantes : []}
-            onAddEstudante={handleAddEstudante}
-            onBatchAddEstudantes={handleBatchAddEstudantes}
-            onResetarEstudantesParaPadrao={handleResetarEstudantesParaPadrao}
-            onUpdateEstudante={handleUpdateEstudante}
-            usuariosAutorizados={Array.isArray(usuariosAutorizados) ? usuariosAutorizados : []}
-            onUpdateUsuariosAutorizados={setUsuariosAutorizados}
-            currentUserRoles={(currentUser?.roles || []) as UserRole[]}
-            currentUserName={currentUser?.name || 'Coordenação Pedagógica'}
-            perfisPedagogicos={Array.isArray(perfisPedagogicos) ? perfisPedagogicos : []}
-            onAddPerfilPedagogico={handleAddPerfilPedagogico}
-            habilidades={Array.isArray(habilidades) ? habilidades : []}
-            onAddHabilidade={handleAddHabilidade}
-            onAprovarHabilidade={handleAprovarHabilidade}
-            documentos={Array.isArray(documentos) ? documentos : []}
-            onAddDocumento={handleAddDocumento}
-            atividades={Array.isArray(atividades) ? atividades : []}
-            historico={Array.isArray(historico) ? historico : []}
-            auditoria={Array.isArray(auditoria) ? auditoria : []}
-            onAddAuditoria={handleAddAuditoria}
-            onVisualizarAtividadeA4={(ativ) => setAtividadeModalA4(ativ)}
-            matrizesCurriculares={Array.isArray(matrizesCurriculares) ? matrizesCurriculares : []}
-            onOpenImportarMatriz={() => setModalImportarMatrizAberto(true)}
-            onOpenCentralMaster={() => setIsMasterDataCenterActive(true)}
-            registrosApoio={Array.isArray(registrosApoio) ? registrosApoio : []}
-            onSalvarRegistroApoio={handleSalvarRegistroApoio}
-            onNavigateToApoio={() => {
-              setCurrentActiveRole('PROFISSIONAL_DE_APOIO');
-              if (typeof window !== 'undefined') {
-                window.history.pushState({}, '', '/apoio-preview');
-              }
-              setCurrentPath('/apoio-preview');
-            }}
-            onOpenGoogleDrive={() => setModalGoogleDriveAberto(true)}
-            isGoogleDriveConnected={isDriveConnected}
-            onOpenCriarPei={handleOpenCriarPei}
-            initialTab={sharedTab}
-            initialEstudanteId={sharedEstudanteId}
-          />
-        ) : isProfissionalApoioActive ? (
-          <ProfissionalApoioView
-            currentUser={currentUser}
-            escolaConfig={escolaConfig}
-            estudantes={Array.isArray(estudantes) ? estudantes : []}
-            onUpdateEstudante={handleUpdateEstudante}
-            registrosApoio={Array.isArray(registrosApoio) ? registrosApoio : []}
-            onSalvarRegistroApoio={handleSalvarRegistroApoio}
-            onAddAuditoria={handleAddAuditoria}
-            matrizesCurriculares={Array.isArray(matrizesCurriculares) ? matrizesCurriculares : []}
-            atividades={Array.isArray(atividades) ? atividades : []}
-            onOpenCriarPei={handleOpenCriarPei}
-            onVoltarParaCoordenacao={
-              Boolean(currentUser?.roles?.includes('coordinator') || currentUser?.roles?.includes('superadmin') || currentUser?.roles?.includes('developer'))
-                ? () => {
-                    setCurrentActiveRole('coordinator');
-                    if (typeof window !== 'undefined') {
-                      window.history.pushState({}, '', '/coordinator-preview');
+        <Suspense fallback={<ViewLoadingFallback message="Carregando módulo do sistema..." />}>
+          {isMasterDataCenterActive && Boolean(currentUser?.roles?.includes('superadmin') || currentUser?.roles?.includes('developer')) ? (
+            <MasterDataCenterView
+              currentUser={currentUser}
+              usuariosAutorizados={Array.isArray(usuariosAutorizados) ? usuariosAutorizados : []}
+              onUpdateUsuarios={setUsuariosAutorizados}
+              estudantes={Array.isArray(estudantes) ? estudantes : []}
+              onUpdateEstudantes={(novos) => setEstudantes(novos)}
+              matrizes={Array.isArray(matrizesCurriculares) ? matrizesCurriculares : []}
+              habilidades={Array.isArray(curriculumSkills) ? curriculumSkills : []}
+              perfis={Array.isArray(perfisPedagogicos) ? perfisPedagogicos : []}
+              documentos={Array.isArray(documentos) ? documentos : []}
+              atividades={Array.isArray(atividades) ? atividades : []}
+              auditoria={Array.isArray(auditoria) ? auditoria : []}
+              escolaConfig={escolaConfig}
+              onUpdateEscolaConfig={setEscolaConfig}
+              onVoltarParaCoordenacao={() => setIsMasterDataCenterActive(false)}
+              onAddAuditoria={handleAddAuditoria}
+            />
+          ) : isCoordinatorActive ? (
+            <CoordenacaoView
+              currentUser={currentUser}
+              escolaConfig={escolaConfig}
+              onUpdateEscolaConfig={setEscolaConfig}
+              estudantes={Array.isArray(estudantes) ? estudantes : []}
+              onAddEstudante={handleAddEstudante}
+              onBatchAddEstudantes={handleBatchAddEstudantes}
+              onResetarEstudantesParaPadrao={handleResetarEstudantesParaPadrao}
+              onUpdateEstudante={handleUpdateEstudante}
+              usuariosAutorizados={Array.isArray(usuariosAutorizados) ? usuariosAutorizados : []}
+              onUpdateUsuariosAutorizados={setUsuariosAutorizados}
+              currentUserRoles={(currentUser?.roles || []) as UserRole[]}
+              currentUserName={currentUser?.name || 'Coordenação Pedagógica'}
+              perfisPedagogicos={Array.isArray(perfisPedagogicos) ? perfisPedagogicos : []}
+              onAddPerfilPedagogico={handleAddPerfilPedagogico}
+              habilidades={Array.isArray(habilidades) ? habilidades : []}
+              onAddHabilidade={handleAddHabilidade}
+              onAprovarHabilidade={handleAprovarHabilidade}
+              documentos={Array.isArray(documentos) ? documentos : []}
+              onAddDocumento={handleAddDocumento}
+              atividades={Array.isArray(atividades) ? atividades : []}
+              historico={Array.isArray(historico) ? historico : []}
+              auditoria={Array.isArray(auditoria) ? auditoria : []}
+              onAddAuditoria={handleAddAuditoria}
+              onVisualizarAtividadeA4={(ativ) => setAtividadeModalA4(ativ)}
+              matrizesCurriculares={Array.isArray(matrizesCurriculares) ? matrizesCurriculares : []}
+              onOpenImportarMatriz={() => setModalImportarMatrizAberto(true)}
+              onOpenCentralMaster={() => setIsMasterDataCenterActive(true)}
+              registrosApoio={Array.isArray(registrosApoio) ? registrosApoio : []}
+              onSalvarRegistroApoio={handleSalvarRegistroApoio}
+              onNavigateToApoio={() => {
+                setCurrentActiveRole('PROFISSIONAL_DE_APOIO');
+                if (typeof window !== 'undefined') {
+                  window.history.pushState({}, '', '/apoio-preview');
+                }
+                setCurrentPath('/apoio-preview');
+              }}
+              onOpenGoogleDrive={() => setModalGoogleDriveAberto(true)}
+              isGoogleDriveConnected={isDriveConnected}
+              onOpenCriarPei={handleOpenCriarPei}
+              initialTab={sharedTab}
+              initialEstudanteId={sharedEstudanteId}
+              onZerarLancamentosEAtividades={handleZerarLancamentosEAtividades}
+            />
+          ) : isProfissionalApoioActive ? (
+            <ProfissionalApoioView
+              currentUser={currentUser}
+              escolaConfig={escolaConfig}
+              estudantes={Array.isArray(estudantes) ? estudantes : []}
+              onUpdateEstudante={handleUpdateEstudante}
+              registrosApoio={Array.isArray(registrosApoio) ? registrosApoio : []}
+              onSalvarRegistroApoio={handleSalvarRegistroApoio}
+              onAddAuditoria={handleAddAuditoria}
+              matrizesCurriculares={Array.isArray(matrizesCurriculares) ? matrizesCurriculares : []}
+              atividades={Array.isArray(atividades) ? atividades : []}
+              onOpenCriarPei={handleOpenCriarPei}
+              onVoltarParaCoordenacao={
+                Boolean(currentUser?.roles?.includes('coordinator') || currentUser?.roles?.includes('superadmin') || currentUser?.roles?.includes('developer'))
+                  ? () => {
+                      setCurrentActiveRole('coordinator');
+                      if (typeof window !== 'undefined') {
+                        window.history.pushState({}, '', '/coordinator-preview');
+                      }
+                      setCurrentPath('/coordinator-preview');
                     }
-                    setCurrentPath('/coordinator-preview');
-                  }
-                : undefined
-            }
-          />
-        ) : (
-          <ProfessorView
-            currentUser={currentUser}
-            escolaConfig={escolaConfig}
-            estudantes={Array.isArray(estudantes) ? estudantes : []}
-            perfisPedagogicos={Array.isArray(perfisPedagogicos) ? perfisPedagogicos : []}
-            habilidadesAprovadas={(Array.isArray(habilidades) ? habilidades : []).filter(h => h && h.status === 'aprovada')}
-            matrizesCurriculares={Array.isArray(matrizesCurriculares) ? matrizesCurriculares : []}
-            habilidadesCurriculares={Array.isArray(curriculumSkills) ? curriculumSkills : []}
-            atividades={Array.isArray(atividades) ? atividades : []}
-            registrosApoio={Array.isArray(registrosApoio) ? registrosApoio : []}
-            onSalvarAtividade={handleSalvarAtividade}
-            onAtualizarAtividade={handleAtualizarAtividade}
-            onVisualizarAtividadeA4={(ativ) => setAtividadeModalA4(ativ)}
-            initialEstudanteId={sharedEstudanteId}
-            initialAtividadeId={sharedAtividadeId}
-            onOpenCriarPei={handleOpenCriarPei}
-          />
-        )}
+                  : undefined
+              }
+            />
+          ) : (
+            <ProfessorView
+              currentUser={currentUser}
+              escolaConfig={escolaConfig}
+              estudantes={Array.isArray(estudantes) ? estudantes : []}
+              perfisPedagogicos={Array.isArray(perfisPedagogicos) ? perfisPedagogicos : []}
+              habilidadesAprovadas={(Array.isArray(habilidades) ? habilidades : []).filter(h => h && h.status === 'aprovada')}
+              matrizesCurriculares={Array.isArray(matrizesCurriculares) ? matrizesCurriculares : []}
+              habilidadesCurriculares={Array.isArray(curriculumSkills) ? curriculumSkills : []}
+              atividades={Array.isArray(atividades) ? atividades : []}
+              registrosApoio={Array.isArray(registrosApoio) ? registrosApoio : []}
+              onSalvarAtividade={handleSalvarAtividade}
+              onAtualizarAtividade={handleAtualizarAtividade}
+              onVisualizarAtividadeA4={(ativ) => setAtividadeModalA4(ativ)}
+              initialEstudanteId={sharedEstudanteId}
+              initialAtividadeId={sharedAtividadeId}
+              onOpenCriarPei={handleOpenCriarPei}
+            />
+          )}
+        </Suspense>
       </main>
 
       {/* Modal de Importação de Matriz Curricular */}
       {modalImportarMatrizAberto && (
-        <ImportarMatrizModal
-          isOpen={modalImportarMatrizAberto}
-          onClose={() => setModalImportarMatrizAberto(false)}
-          onSaveMatrixAndSkills={handleSaveMatrixAndSkills}
-          onBatchSaveMatricesAndSkills={handleBatchSaveMatricesAndSkills}
-          currentUserName={currentUser?.name || 'Coordenação'}
-        />
+        <Suspense fallback={<ModalLoadingFallback title="Carregando Matriz Curricular..." />}>
+          <ImportarMatrizModal
+            isOpen={modalImportarMatrizAberto}
+            onClose={() => setModalImportarMatrizAberto(false)}
+            onSaveMatrixAndSkills={handleSaveMatrixAndSkills}
+            onBatchSaveMatricesAndSkills={handleBatchSaveMatricesAndSkills}
+            currentUserName={currentUser?.name || 'Coordenação'}
+          />
+        </Suspense>
       )}
 
       {/* Modal de Folha A4 */}
       {atividadeModalA4 && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-6">
-          <div className="relative w-full max-w-5xl bg-slate-100 rounded-2xl shadow-xl p-4 sm:p-6 my-auto">
-            <div className="no-print flex items-center justify-between pb-3 mb-4 border-b border-slate-300">
-              <span className="font-extrabold text-slate-800 text-sm sm:text-base">
-                Folha A4 da Atividade Adaptada
-              </span>
-              <button
-                onClick={() => setAtividadeModalA4(null)}
-                className="p-1.5 rounded-lg bg-white border text-slate-500 hover:text-slate-800 cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+        <Suspense fallback={<ModalLoadingFallback title="Carregando Folha A4..." />}>
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-6">
+            <div className="relative w-full max-w-5xl bg-slate-100 rounded-2xl shadow-xl p-4 sm:p-6 my-auto">
+              <div className="no-print flex items-center justify-between pb-3 mb-4 border-b border-slate-300">
+                <span className="font-extrabold text-slate-800 text-sm sm:text-base">
+                  Folha A4 da Atividade Adaptada
+                </span>
+                <button
+                  onClick={() => setAtividadeModalA4(null)}
+                  className="p-1.5 rounded-lg bg-white border text-slate-500 hover:text-slate-800 cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
 
-            <div className="max-h-[85vh] overflow-y-auto px-1 py-2 flex justify-center">
-              <A4SheetPreview
-                atividade={atividadeModalA4}
-                escolaConfig={escolaConfig}
-                onEditQuestao={(questaoAtualizada) => {
-                  const novas = atividadeModalA4.questoes.map(q => q.id === questaoAtualizada.id ? questaoAtualizada : q);
-                  const atualizada: AtividadeAdaptada = { ...atividadeModalA4, questoes: novas, status: 'Revisada' };
-                  setAtividadeModalA4(atualizada);
-                  handleAtualizarAtividade(atualizada);
-                }}
-              />
+              <div className="max-h-[85vh] overflow-y-auto px-1 py-2 flex justify-center">
+                <A4SheetPreview
+                  atividade={atividadeModalA4}
+                  escolaConfig={escolaConfig}
+                  onEditQuestao={(questaoAtualizada) => {
+                    const novas = atividadeModalA4.questoes.map(q => q.id === questaoAtualizada.id ? questaoAtualizada : q);
+                    const atualizada: AtividadeAdaptada = { ...atividadeModalA4, questoes: novas, status: 'Revisada' };
+                    setAtividadeModalA4(atualizada);
+                    handleAtualizarAtividade(atualizada);
+                  }}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        </Suspense>
       )}
 
       {/* Modal de Gerenciamento do Google Drive (Pastas por Série e Uploads) */}
       {modalGoogleDriveAberto && (
-        <GoogleDriveManagerModal
-          isOpen={modalGoogleDriveAberto}
-          onClose={() => setModalGoogleDriveAberto(false)}
-          estudantes={estudantes}
-          registrosApoio={registrosApoio}
-        />
+        <Suspense fallback={<ModalLoadingFallback title="Carregando Google Drive..." />}>
+          <GoogleDriveManagerModal
+            isOpen={modalGoogleDriveAberto}
+            onClose={() => setModalGoogleDriveAberto(false)}
+            estudantes={estudantes}
+            registrosApoio={registrosApoio}
+          />
+        </Suspense>
       )}
 
       {/* Modal Oficial do Módulo: Criar PEI (SEDUC-GO / SIAP) */}
       {modalPeiAberto && (
-        <PeiGeneratorModal
-          isOpen={modalPeiAberto}
-          onClose={() => {
-            setModalPeiAberto(false);
-            setPeiEstudanteSelecionadoId(undefined);
-          }}
-          students={estudantes}
-          staffMembers={usuariosAutorizados}
-          escolaConfig={escolaConfig}
-          initialStudentId={peiEstudanteSelecionadoId}
-          onSavePei={handleSavePei}
-        />
+        <Suspense fallback={<ModalLoadingFallback title="Carregando Gerador de PEI..." />}>
+          <PeiGeneratorModal
+            isOpen={modalPeiAberto}
+            onClose={() => {
+              setModalPeiAberto(false);
+              setPeiEstudanteSelecionadoId(undefined);
+            }}
+            students={estudantes}
+            staffMembers={usuariosAutorizados}
+            escolaConfig={escolaConfig}
+            initialStudentId={peiEstudanteSelecionadoId}
+            onSavePei={handleSavePei}
+          />
+        </Suspense>
       )}
 
     </div>

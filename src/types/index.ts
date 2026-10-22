@@ -428,6 +428,32 @@ export interface AtividadeAdaptada {
   arquivoDriveId?: string;
   pdfUrl?: string;
 
+  // Versionamento e Histórico de Adaptação (Fase 5 SEDUC-GO)
+  versao?: number; // v1, v2, v3...
+  versaoAnteriorId?: string; // ID da versão anterior
+  atividadeOriginalId?: string; // ID da primeira versão gerada (raiz)
+  historicoVersoes?: Array<{
+    versao: number;
+    data: string;
+    alteracoes: string;
+    autor: string;
+    motivo: string;
+  }>;
+
+  // Integração com Profissional de Apoio (PAE) e Sugestão de Revisão Explicável
+  necessitaRevisaoApoio?: boolean;
+  motivoRevisaoApoio?: string;
+  registroApoioVinculadoId?: string;
+  sugestaoAdaptacaoExplicavel?: {
+    motivoDificuldade: string;
+    alteracoesSugeridas: string;
+    preservacaoHabilidade: string;
+    dataSugestao: string;
+    paeNome?: string;
+    statusAprovacao: 'pendente' | 'aprovada' | 'recusada';
+    justificativaPedagogica?: string;
+  };
+
   // Persistência Offline e Sincronização IndexedDB
   syncStatus?: 'synced' | 'pending_sync' | 'offline_created' | 'offline_updated';
   lastModifiedLocally?: string;
@@ -746,6 +772,7 @@ export interface RegistroAcompanhamentoApoio {
 
   // Pergunta 4: Registro de atividade adaptada (apenas quando presente)
   recebeuAtividadeAdaptada?: 'Sim' | 'Não';
+  atividadeAplicadaId?: string; // ID da atividade adaptada vinculada
   disciplinasEnvolvidas?: string[]; // Múltipla seleção das disciplinas da Matriz Curricular
   conseguiuRealizarAtividade?: 'Sim' | 'Parcialmente' | 'Não';
   observacaoAtividade?: string;
@@ -829,7 +856,7 @@ export interface RelatorioBimestralAprendizagem {
 
 export interface SyncQueueItem {
   id: string;
-  entity: 'registro_apoio' | 'estudante' | 'atividade' | 'perfil' | 'outro';
+  entity: 'registro_apoio' | 'estudante' | 'atividade' | 'perfil' | 'documento' | 'pei' | 'outro';
   entityId: string;
   operation: 'create' | 'update' | 'delete';
   payload: any;

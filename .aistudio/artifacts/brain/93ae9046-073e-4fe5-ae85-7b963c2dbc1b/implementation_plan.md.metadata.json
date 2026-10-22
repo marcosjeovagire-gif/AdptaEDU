@@ -1,6 +1,6 @@
 {
-  "summary": "Plano de implementação para inclusão do parâmetro 'formatoLetra' ('bastao' ou 'cursiva') no serviço de geração de atividades e PEI (peiService.ts), com detecção automática baseada no laudo do estudante e opções de override manual, garantindo tipografia legível (Lexend) e caixa alta quando houver necessidade pedagógica.",
-  "updatedAt": "2026-10-15T12:56:31.898872111Z",
+  "summary": "Plano de implementação para o AdaptaEdu Escolar contemplando: 1) DashboardView com Recharts, seletor de intervalo de datas (mês atual padrão + customizado), agrupamento por turma e exportação de PDF analítico para coordenação e professores; 2) Integração do diário de bordo do Profissional de Apoio com o motor de geração de atividades adaptadas; 3) Suporte integral à modalidade Imagem e Letra Bastão (Caixa Alta, fonte Lexend, maior espaçamento); 4) Refinamento da tela de login (largura 460-520px / 92-96%, menor privilégio e mensagens amigáveis); 5) Regras de segurança no Firestore e operação Offline-First.",
+  "updatedAt": "2026-10-20T10:39:57.508148039Z",
   "requestFeedback": true,
   "userFacing": true
 }

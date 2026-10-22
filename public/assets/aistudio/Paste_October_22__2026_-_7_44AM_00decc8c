@@ -1,0 +1,1164 @@
+ACT AS A SENIOR FULL-STACK SOFTWARE ENGINEER, SENIOR SOFTWARE ARCHITECT, DATABASE ARCHITECT, FIREBASE SECURITY SPECIALIST, EDUCATIONAL SYSTEMS ARCHITECT, UI/UX ENGINEER, ACCESSIBILITY SPECIALIST, AND PEDAGOGICAL DOCUMENT LAYOUT DESIGNER.
+
+You must audit, repair, secure, improve, test, and evolve the existing web application:
+
+“AdaptaEdu Escolar”
+Colégio Estadual Olynto Pereira de Castro
+SEDUC-GO
+
+The existing project may use React, TypeScript, Vite, Tailwind CSS, Firebase Authentication, Cloud Firestore, Firebase Storage, Express, IndexedDB, Service Workers, Google Drive, and the Gemini API through @google/genai.
+
+IMPORTANT LANGUAGE REQUIREMENT:
+
+This implementation prompt is written in English to improve technical interpretation. However, the entire application output must remain in Brazilian Portuguese.
+
+All of the following must remain in Brazilian Portuguese:
+
+• menus;
+• buttons;
+• form labels;
+• placeholders;
+• validation messages;
+• notifications;
+• loading messages;
+• dashboards;
+• reports;
+• educational activities;
+• PEI documents;
+• pedagogical reports;
+• PDF documents;
+• print documents;
+• accessibility labels;
+• error messages;
+• user guidance;
+• generated educational content.
+
+Do not translate the application interface into English.
+
+The source code may use English technical identifiers when required by the existing project conventions, but all user-facing content must remain in Brazilian Portuguese.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. PRIMARY MISSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Your mission is to update, repair, complete, secure, and improve the existing AdaptaEdu Escolar system without recreating the application from scratch.
+
+You must preserve:
+
+• all existing screens;
+• all existing modules;
+• all existing routes;
+• all existing registered users;
+• all existing students;
+• all existing professionals;
+• all existing educational records;
+• all existing activities;
+• all existing PEI records;
+• all existing support professional reports;
+• all existing curriculum matrices;
+• all stored documents;
+• all official school logos;
+• all SEDUC-GO logos;
+• the current institutional visual identity;
+• the existing Google Drive integration;
+• all working Firebase integrations;
+• all currently functioning features;
+• all current role-based permissions, except when a security correction is necessary;
+• all existing database records;
+• all existing environment configurations.
+
+Do not remove an existing feature merely to make the application compile.
+
+Do not replace real functions with mock data, placeholders, alerts, static cards, or simulated behavior.
+
+Do not create a new application when the existing application can be repaired.
+
+Do not alter existing Firebase, Google Drive, authentication, hosting, or environment configurations unless a verified technical problem requires a specific change.
+
+When a configuration change is technically required:
+
+1. create a backup or checkpoint first;
+2. document the current value;
+3. explain why the change is required;
+4. apply the smallest compatible change;
+5. preserve backward compatibility whenever possible;
+6. test the change;
+7. provide a rollback procedure;
+8. never expose secrets, credentials, tokens, private keys, or service account data.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. MANDATORY INITIAL AUDIT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before modifying any file, inspect the entire available project.
+
+Audit at least:
+
+• package.json;
+• package-lock.json, yarn.lock, pnpm-lock.yaml, or bun.lock;
+• src/App.tsx;
+• src/main.tsx;
+• src/types.ts;
+• all views;
+• all components;
+• all hooks;
+• all contexts;
+• all services;
+• all Firebase initialization files;
+• firebase-applet-config.json;
+• firestore.rules;
+• firestore.indexes.json;
+• storage.rules;
+• vite.config.ts;
+• server.ts or equivalent backend entry point;
+• environment variable usage;
+• authentication flow;
+• Google Drive integration;
+• Gemini API integration;
+• IndexedDB usage;
+• localStorage usage;
+• sessionStorage usage;
+• Service Worker configuration;
+• manifest and PWA files;
+• PDF generation services;
+• A4 preview components;
+• curriculum matrix import modules;
+• PEI generation modules;
+• support professional modules;
+• bimonthly report modules;
+• activity generation modules;
+• audit and history modules.
+
+Do not assume that the stack versions mentioned in this prompt are installed.
+
+Read package.json and the lockfile first.
+
+Use the versions already installed unless an upgrade is strictly required. Do not force React 19, a new Firebase version, or another dependency upgrade when the current version can safely support the required implementation.
+
+Create an engineering audit with:
+
+• current architecture;
+• detected technologies and versions;
+• broken imports;
+• compilation errors;
+• TypeScript errors;
+• data synchronization problems;
+• security risks;
+• missing Firestore rules;
+• missing indexes;
+• duplicated sources of truth;
+• data-loss risks;
+• UTF-8 corruption;
+• incomplete buttons;
+• disconnected forms;
+• inaccessible interfaces;
+• PDF layout defects;
+• incomplete Gemini integrations;
+• missing role authorization;
+• offline synchronization risks;
+• race conditions;
+• conflicts between local and cloud data;
+• features that only appear visually but are not implemented.
+
+After the audit, implement the required corrections directly in the project.
+
+Do not stop after presenting an analysis or plan.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. BACKUP, CHECKPOINT, AND ROLLBACK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before making structural changes:
+
+1. create a complete checkpoint of the current working project;
+2. preserve the current configuration files;
+3. preserve all existing environment variable names;
+4. export or preserve the current database schema information;
+5. identify the collections and document structures currently in use;
+6. record the current build status;
+7. identify files that will be modified.
+
+Do not include the following in the backup archive:
+
+• node_modules;
+• build artifacts;
+• temporary caches;
+• exposed secrets;
+• private service account keys;
+• unnecessary personal student data.
+
+Create a rollback strategy.
+
+If a modification causes regression:
+
+• revert only the defective modification;
+• preserve unrelated working changes;
+• do not delete the affected module;
+• do not reset the entire application without necessity;
+• do not erase real records;
+• do not create a new Firebase project as a shortcut.
+
+For database schema evolution, use additive and backward-compatible migrations whenever possible.
+
+Never rename or delete a Firestore collection or field without:
+
+• examining all references;
+• preparing a migration;
+• preserving old data;
+• validating migrated records;
+• documenting rollback.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. UTF-8 ENCODING AND BRAZILIAN PORTUGUESE INTEGRITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Repair all truncated, corrupted, or incorrectly encoded Brazilian Portuguese text across the complete project.
+
+Inspect files including, but not limited to:
+
+• App.tsx;
+• Header.tsx;
+• LoginView.tsx;
+• A4SheetPreview.tsx;
+• RelatorioMensalApoioModal.tsx;
+• GoogleDriveManagerModal.tsx;
+• OfflineStatusIndicator.tsx;
+• ProfessorView.tsx;
+• ProfissionalApoioView.tsx;
+• PeiGeneratorModal.tsx;
+• all services;
+• all templates;
+• all generated document labels.
+
+Examples of corrupted text to repair include:
+
+• “Educa o” → “Educação”;
+• “Coordena o” → “Coordenação”;
+• “Goi s” → “Goiás”;
+• “S rie” → “Série”;
+• “Per odo” → “Período”;
+• “Diagn stico” → “Diagnóstico”;
+• “Di rio” → “Diário”;
+• “N o” → “Não”;
+• “M s” → “Mês”;
+• “Hist rico” → “Histórico”.
+
+Requirements:
+
+• use UTF-8 consistently;
+• preserve Brazilian Portuguese diacritics;
+• verify saved source files;
+• verify generated HTML;
+• verify PDF output;
+• verify CSV export;
+• verify Firestore strings;
+• verify Google Drive file names;
+• verify print previews;
+• verify text generated by Gemini;
+• prevent double-encoding;
+• prevent mojibake;
+• preserve characters such as º, ª, ç, ã, õ, á, é, í, ó, ú.
+
+Do not perform blind global replacements that could damage code identifiers, URLs, IDs, or legitimate content.
+
+After correction, confirm that:
+
+• JSX tags are complete;
+• braces are balanced;
+• strings are properly closed;
+• template literals are valid;
+• JSON remains valid;
+• tsc --noEmit succeeds;
+• the production build succeeds.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. SINGLE SOURCE OF TRUTH AND REAL-TIME MULTI-DEVICE OPERATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The application currently stores essential state in localStorage, IndexedDB, or sessionStorage. This prevents reliable synchronization between Coordination, Teachers, and Support Professionals using different devices.
+
+Refactor the persistence architecture so the official shared source of truth is Cloud Firestore, while IndexedDB provides offline-first local persistence and localStorage is used only for non-sensitive preferences when appropriate.
+
+Do not maintain multiple independent authoritative databases.
+
+The preferred hierarchy is:
+
+1. Cloud Firestore:
+   official shared database and authoritative synchronized state;
+
+2. IndexedDB or Firestore offline persistence:
+   offline cache and pending operations;
+
+3. localStorage:
+   non-sensitive interface preferences only;
+
+4. sessionStorage:
+   temporary non-authoritative session information only.
+
+Synchronize, when present:
+
+• estudantes;
+• perfisPedagogicos;
+• habilidades;
+• documentos;
+• atividades;
+• registrosApoio;
+• matrizesCurriculares;
+• curriculumSkills;
+• relatoriosBimestrais;
+• peiDocuments;
+• historico;
+• auditoria;
+• usuariosAutorizados;
+• turmas;
+• professores;
+• profissionaisApoio;
+• vínculos;
+• notificações.
+
+Create or improve a centralized synchronization layer, such as:
+
+src/services/networkSyncService.ts
+
+Use real-time Firestore listeners such as onSnapshot only where appropriate.
+
+Requirements:
+
+• unsubscribe listeners when components unmount;
+• prevent duplicated listeners;
+• prevent memory leaks;
+• prevent infinite update loops;
+• prevent a Firestore update from being written back unchanged;
+• track server timestamps;
+• distinguish pending local changes from confirmed cloud changes;
+• handle reconnects;
+• handle expired authentication;
+• handle permission errors;
+• handle offline mode;
+• display synchronization status;
+• protect against accidental overwrites;
+• preserve conflict history;
+• paginate large collections;
+• avoid downloading entire collections when unnecessary.
+
+Do not mirror the entire application state into localStorage after every update.
+
+Do not store sensitive student records in unencrypted browser storage unless the existing architecture and security requirements explicitly justify it.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. FIRESTORE AS THE OFFICIAL SHARED DATABASE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use the existing Firebase project configured by the application.
+
+Do not print, expose, duplicate, or hard-code secret credentials.
+
+Do not create another Firebase project.
+
+Review:
+
+• Firebase Authentication;
+• Firestore initialization;
+• Firestore persistence;
+• Storage;
+• Cloud Functions, if present;
+• App Check, if present;
+• Firestore indexes;
+• security rules;
+• authorized domains;
+• token and session handling.
+
+Do not assume that the presence of firebase-applet-config.json proves that all Firebase services are correctly connected.
+
+Verify the real initialization path used by the application.
+
+If firebase-applet-config.json contains client-side Firebase configuration, treat the values according to Firebase client configuration practices, but never expose:
+
+• service account private keys;
+• admin credentials;
+• access tokens;
+• refresh tokens;
+• Gemini API keys;
+• Google Drive secrets.
+
+All privileged administrative operations must remain server-side or use secure Firebase mechanisms.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+7. LOCAL SCHOOL NETWORK ACCESS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Allow authorized users on the same school LAN or Wi-Fi network to open the development or locally hosted application from other devices when this deployment mode is intentionally enabled.
+
+Configure the existing Vite or Express server, when compatible with the project, using behavior equivalent to:
+
+server: {
+  host: '0.0.0.0',
+  port: 3000
+}
+
+Do not hard-code a LAN IP address.
+
+Display the detected network URL only in an administrative or development connectivity panel.
+
+Examples may include:
+
+http://192.168.x.x:3000
+
+However, do not claim the application is securely available on a LAN merely because Vite listens on 0.0.0.0.
+
+Also verify:
+
+• operating system firewall;
+• port availability;
+• network isolation;
+• CORS;
+• authentication;
+• HTTPS requirements;
+• device access;
+• server hostname;
+• session security.
+
+Cloud Firestore must remain the shared real-time source of truth for normal multi-device synchronization.
+
+Do not create an unnecessary second synchronization database through /api/sync-state if Firestore already satisfies the requirement.
+
+A local API or LAN synchronization endpoint may be implemented only when:
+
+• a genuine offline-LAN use case exists;
+• the architecture requires it;
+• authentication is enforced;
+• authorization is enforced;
+• conflict resolution is defined;
+• data-at-rest and data-in-transit risks are considered;
+• the endpoint does not bypass Firestore security rules;
+• the local server does not become an unprotected administrative gateway.
+
+BroadcastChannel may synchronize tabs on the same browser or origin, but it must not be described as a cross-device network synchronization tool.
+
+Use each mechanism for its correct scope:
+
+• Firestore onSnapshot: authorized multi-device real-time synchronization;
+• IndexedDB: local offline persistence;
+• Service Worker: cached application resources and controlled offline support;
+• BroadcastChannel: synchronization between tabs on the same origin;
+• Local API, SSE, or WebSocket: only if a justified and secured local-server use case exists.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+8. CONNECTION AND SYNCHRONIZATION STATUS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Add or improve a clear connectivity indicator in Header.tsx and the connectivity panel.
+
+Brazilian Portuguese labels may include:
+
+• “Rede Escolar Ativa”;
+• “Sincronização em tempo real”;
+• “Modo offline”;
+• “Sincronização pendente”;
+• “Sincronizando...”;
+• “Última sincronização”;
+• “Erro de permissão”;
+• “Conexão restabelecida”.
+
+The indicator must reflect real status, not a simulated state.
+
+Display:
+
+• online or offline state;
+• authenticated state;
+• Firestore connection state;
+• pending local changes;
+• last successful synchronization;
+• synchronization error;
+• retry action when appropriate.
+
+Do not expose network infrastructure, tokens, credentials, internal stack traces, or sensitive record data.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+9. ROLE-BASED ACCESS CONTROL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Preserve and secure the following profiles:
+
+• COORDENAÇÃO;
+• PROFESSOR;
+• PROFISSIONAL_DE_APOIO.
+
+The visual role selected on the login screen must never determine authorization by itself.
+
+After authentication, the application must load the authorized role from a protected user record, custom claim, or another secure server-controlled source.
+
+Implement the principle of least privilege.
+
+COORDENAÇÃO may have permission to:
+
+• manage authorized users;
+• manage students;
+• manage classes;
+• manage curriculum matrices;
+• manage PEI workflows;
+• review reports;
+• view institutional indicators;
+• manage professional-student assignments;
+• review audit records;
+• approve or archive documents.
+
+PROFESSOR may have permission to:
+
+• access assigned classes and students;
+• consult curriculum matrices;
+• generate adapted activities;
+• review support professional observations for assigned students;
+• generate or contribute to reports;
+• edit permitted PEI sections;
+• create and approve pedagogical activity versions.
+
+PROFISSIONAL_DE_APOIO may have permission to:
+
+• access only assigned students;
+• receive assigned activities;
+• record application observations;
+• complete support logs;
+• register mediation level;
+• identify barriers and successful strategies;
+• contribute authorized information to reports;
+• view only the necessary curriculum and pedagogical information.
+
+Do not allow a client-side user to change the user’s own role to COORDENAÇÃO.
+
+Do not grant broad collection access solely because a user is authenticated.
+
+Authorization must consider, where applicable:
+
+• role;
+• school;
+• class;
+• assigned students;
+• document ownership;
+• activity assignment;
+• report assignment;
+• record status;
+• operation type.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+10. FIRESTORE SECURITY RULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Audit firestore.rules completely.
+
+If compatible with the current user document structure, add or correct a function equivalent to:
+
+hasSupportRole()
+
+The function must securely recognize the authorized role:
+
+PROFISSIONAL_DE_APOIO
+
+Do not copy a role-checking expression blindly. Inspect the actual user document schema first.
+
+Add secure read and write rules, when these collections exist:
+
+• /supportLogs/{logId};
+• /curriculumMatrices/{matrixId};
+• /bimonthlyReports/{reportId};
+• /peiDocuments/{peiId};
+• /documents/{docId};
+• /activities/{activityId};
+• /students/{studentId};
+• /classes/{classId};
+• /notifications/{notificationId};
+• /auditLogs/{auditId};
+• /users/{userId}.
+
+Requirements:
+
+• deny access by default;
+• never use allow read, write: if true;
+• validate required fields;
+• validate allowed field types;
+• validate ownership and assignment;
+• prevent users from changing protected fields;
+• prevent users from elevating their roles;
+• prevent support professionals from accessing unrelated students;
+• prevent teachers from accessing unrelated classes;
+• protect restricted documents;
+• protect audit records;
+• restrict deletion;
+• validate school or tenant scope if present;
+• validate document status changes.
+
+Use the Firebase Emulator Suite or an equivalent rule-testing process when available.
+
+Create tests for allowed and denied scenarios.
+
+Do not declare the rules correct merely because the application can read and write.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+11. CURRICULUM MATRIX PDF IMPORT AND STRUCTURED INDEXING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Improve the Curriculum Matrix module, including components or services such as:
+
+• curriculumMatrixService.ts;
+• ImportarMatrizModal.tsx;
+• Curriculum Matrix tab;
+• Skills tab;
+• PDF viewer;
+• PDF search service.
+
+The curriculum matrix PDF must become the official curricular source used by the activity generator and pedagogical document workflows.
+
+When importing one or more curriculum matrix PDFs, extract and structure, when those fields are actually present:
+
+• education stage;
+• grade or school year;
+• class applicability;
+• bimester;
+• temporal division;
+• curriculum component;
+• thematic unit or axis;
+• knowledge object;
+• content;
+• skill code;
+• complete skill description;
+• DC-GO or BNCC reference;
+• pedagogical guidance;
+• curriculum examples;
+• source PDF identifier;
+• source file name;
+• source page number;
+• exact extracted passage;
+• extraction date;
+• extraction confidence;
+• manual review status.
+
+Possible internal properties may include:
+
+• pdfRawContext;
+• orientacoesPedagogicasMatriz;
+• exemplosConteudoMatriz;
+• sourcePage;
+• sourceDocumentId;
+• extractionStatus;
+• reviewedBy;
+• reviewedAt.
+
+Do not assume every PDF follows the same layout.
+
+Support:
+
+• native-text PDFs;
+• multi-column documents;
+• tables;
+• page headers and footers;
+• repeated headings;
+• scanned PDFs requiring OCR, when OCR is available;
+• damaged or password-protected PDFs;
+• extraction failures;
+• manual correction;
+• extraction review before publication.
+
+Never invent unreadable text.
+
+If the system cannot accurately extract a field:
+
+• mark the field as unresolved;
+• show the source page;
+• allow authorized manual review;
+• do not fabricate a value;
+• do not silently use an uncertain skill.
+
+Preserve the original imported PDF.
+
+Keep the original file linked to the structured records.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+12. CURRICULUM MATRIX PDF VIEWER AND SEARCH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Provide an authorized PDF viewer and structured search interface.
+
+Allow searches and filters by:
+
+• grade;
+• school year;
+• bimester;
+• curriculum component;
+• thematic unit;
+• knowledge object;
+• content;
+• skill code;
+• skill description;
+• keyword;
+• source page.
+
+Each structured result must allow the user to verify:
+
+• the exact extracted text;
+• the corresponding page;
+• the source PDF;
+• the structured fields;
+• whether the record was manually reviewed;
+• whether the match is exact, strong, partial, or insufficient.
+
+Do not show a fabricated numerical confidence percentage unless the application calculates it using a real documented method.
+
+When multiple curriculum records may match, require the Teacher to select or confirm the correct result.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+13. CENTRALIZED CURRICULUM CONTEXT SERVICE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create or improve a centralized service equivalent to:
+
+consultarMatrizPdfContext()
+
+The exact name may follow the existing naming convention.
+
+Inputs may include:
+
+• student;
+• grade;
+• class;
+• curriculum component;
+• bimester;
+• thematic unit;
+• knowledge object;
+• content;
+• skill code;
+• skill description.
+
+The function must return verified curriculum context, including:
+
+• source matrix ID;
+• source PDF ID;
+• source page;
+• grade;
+• bimester;
+• curriculum component;
+• thematic unit;
+• knowledge object;
+• official skill code;
+• official skill description;
+• official content passage;
+• pedagogical guidance, if present;
+• verification status.
+
+Use this centralized context in:
+
+• adapted activity generation;
+• Support Professional Logbook;
+• Support Professional Report;
+• PEI generation;
+• Bimonthly Learning Report;
+• Pedagogical Opinion or Student Pedagogical Profile;
+• document preview;
+• A4 PDF export.
+
+Do not duplicate inconsistent curriculum-search logic across components.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+14. ACTIVITY GENERATOR AS AN INTEGRATED PEDAGOGICAL WORKFLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+The Teacher Activity Generator must integrate three verified sources:
+
+SOURCE 1 — CURRICULUM MATRIX
+
+• grade;
+• class;
+• bimester;
+• curriculum component;
+• thematic unit;
+• knowledge object;
+• content;
+• official skill code;
+• official skill description;
+• source PDF passage;
+• source page.
+
+SOURCE 2 — TEACHER INSTRUCTION
+
+• proposed content;
+• lesson objective;
+• activity type;
+• number of questions;
+• difficulty level;
+• desired response format;
+• visual preferences;
+• application instructions;
+• evaluation criteria.
+
+SOURCE 3 — AUTHORIZED STUDENT PEDAGOGICAL CONTEXT
+
+• PEI strategies;
+• previously authorized adaptations;
+• previous activities;
+• previous results;
+• Support Professional reports;
+• observed barriers;
+• successful mediation strategies;
+• unsuccessful strategies;
+• required support level;
+• relevant permitted pedagogical profile information.
+
+The generated activity must be based on the intersection of these sources.
+
+Do not invent:
+
+• curriculum skills;
+• skill codes;
+• PDF passages;
+• student characteristics;
+• diagnoses;
+• PEI data;
+• support reports;
+• performance results;
+• clinical conclusions;
+• pedagogical facts.
+
+The Teacher must always review and approve the final activity.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+15. MANDATORY PRE-GENERATION ACTIVITY WIZARD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Before generating an activity, display a mandatory configuration wizard.
+
+STEP 1 — STUDENT AND CURRICULUM CONTEXT
+
+Require:
+
+• student or class;
+• grade;
+• curriculum component;
+• bimester;
+• thematic unit;
+• knowledge object;
+• content;
+• official skill.
+
+Display:
+
+• official skill code;
+• complete official skill description;
+• source matrix;
+• source PDF passage;
+• source page.
+
+STEP 2 — TYPOGRAPHIC AND VISUAL FORMAT
+
+Ask:
+
+“Qual formato de letra e recurso visual deseja utilizar?”
+
+Provide three functional choices:
+
+1. SOMENTE LETRA BASTÃO
+
+Brazilian Portuguese label:
+
+“Somente letra bastão, em caixa alta”
+
+Requirements:
+
+• convert all student-facing text to uppercase;
+• use a clear sans-serif font;
+• use direct sentences;
+• use increased spacing;
+• avoid decorative distractions;
+• preserve official skill codes as originally stored;
+• preserve URLs, technical identifiers, and references when case changes would damage them.
+
+2. LETRA BASTÃO + DESENHO RELACIONADO À MATRIZ
+
+Brazilian Portuguese label:
+
+“Letra bastão com desenho relacionado ao conteúdo”
+
+Requirements:
+
+• all student-facing instructions in uppercase;
+• educational illustration linked to the curriculum content;
+• illustration linked to the knowledge object;
+• illustration linked to the selected skill;
+• visual must serve a pedagogical purpose;
+• no irrelevant decorative images;
+• allow color illustration;
+• allow black-and-white line art for coloring or interpretation;
+• preserve adequate answer space;
+• provide digital alternative text;
+• maintain print quality;
+• preserve readability in grayscale.
+
+3. LETRA CURSIVA PEDAGÓGICA
+
+Brazilian Portuguese label:
+
+“Letra cursiva pedagógica”
+
+Requirements:
+
+• use a readable school handwriting style;
+• include handwriting guide lines when requested;
+• allow dotted or dashed tracing text;
+• preserve curriculum content;
+• provide a reliable PDF-safe font fallback;
+• do not depend exclusively on an online font that may disappear during PDF export;
+• test accented Brazilian Portuguese characters;
+• allow the Teacher to preview and replace the selected cursive font.
+
+Do not label a generic script font as pedagogically suitable without checking readability, accents, PDF embedding, and print output.
+
+STEP 3 — VISUAL OPTION
+
+If the Teacher selects drawing support, ask:
+
+• color illustration;
+• black-and-white illustration;
+• drawing for interpretation;
+• drawing for completion;
+• drawing as answer;
+• drawing for coloring with a pedagogical purpose;
+• free drawing space;
+• guided drawing.
+
+STEP 4 — SUPPORT LEVEL
+
+Ask:
+
+“Qual nível de suporte ou mediação será considerado?”
+
+Options:
+
+• alto suporte visual e guiado;
+• suporte moderado;
+• autonomia progressiva;
+• configuração personalizada.
+
+STEP 5 — QUESTION FORMAT
+
+Allow:
+
+• multiple choice;
+• visual association;
+• true or false;
+• completion;
+• matching;
+• sequencing;
+• adapted open response;
+• drawing response;
+• oral response;
+• practical activity;
+• mixed activity.
+
+STEP 6 — QUANTITY AND LAYOUT
+
+Allow:
+
+• number of questions;
+• font size;
+• answer-space size;
+• one question per block;
+• one question per page;
+• portrait or landscape;
+• color or grayscale;
+• student copy;
+• Teacher guidance;
+• Support Professional guidance;
+• separate answer key.
+
+Every selected option must change the generated activity.
+
+Do not create decorative controls that have no implementation.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+16. ACTIVITY TYPE DEFINITIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Update the existing TypeScript types only after inspecting the current interfaces and their usage.
+
+Add fields compatible with the current schema, such as:
+
+estiloTipograficoVisual:
+  | 'letra_bastao'
+  | 'letra_bastao_desenho_matriz'
+  | 'letra_cursiva';
+
+estiloDesenho?:
+  | 'colorido'
+  | 'preto_e_branco_colorir'
+  | 'interpretacao'
+  | 'completar'
+  | 'resposta_por_desenho';
+
+trechoMatrizPdfConsultado?: string;
+paginaMatrizPdfConsultada?: number;
+matrizCurricularId?: string;
+habilidadeCodigo?: string;
+habilidadeDescricao?: string;
+resumoRelatorioApoioUtilizado?: string;
+peiConsiderado?: string;
+versaoAtividade?: number;
+atividadeOrigemId?: string;
+relatorioApoioOrigemId?: string;
+
+For each adapted question, fields may include:
+
+ilustracaoSvgOuUrl?: string;
+descricaoDesenhoMatriz?: string;
+textoAlternativoIlustracao?: string;
+textoCaligraficoPontilhado?: string;
+espacoResposta?: 'pequeno' | 'medio' | 'amplo';
+quebraPaginaAntes?: boolean;
+
+Do not add personal or clinical data directly to activity documents.
+
+Do not duplicate complete sensitive reports inside an activity record.
+
+Prefer secure references and a minimal approved pedagogical summary.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+17. GEMINI ACTIVITY GENERATION ENGINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Use the existing Gemini integration through @google/genai only after verifying its current implementation.
+
+Do not move a secret Gemini API key into client-side code.
+
+If privileged calls currently occur in the browser, review whether a secure server-side function or endpoint is required.
+
+The Gemini generation context must contain only the minimum authorized information necessary.
+
+The generation engine must receive:
+
+• verified official curriculum context;
+• Teacher-selected activity configuration;
+• approved pedagogical adaptations;
+• relevant structured support observations;
+• PEI strategies when authorized;
+• previous activity outcome when relevant.
+
+The generation engine must not receive unnecessary:
+
+• full clinical documents;
+• full personal identification data;
+• unrelated support reports;
+• unrelated student records;
+• access tokens;
+• credentials;
+• other students’ information.
+
+Require structured output with a validated schema.
+
+Validate the model response before saving.
+
+Reject or require correction when the output contains:
+
+• an invented skill code;
+• an altered official skill;
+• empty questions;
+• duplicated questions;
+• unsafe HTML;
+• undefined values;
+• missing answers;
+• content unrelated to the curriculum;
+• unsupported conclusions about the student;
+• leaked sensitive information;
+• malformed JSON;
+• non-Portuguese student-facing text;
+• inaccessible image usage;
+• formatting incompatible with A4.
+
+If Gemini is unavailable, do not fabricate that AI generation succeeded.
+
+Provide a controlled fallback based on validated templates and the curriculum context, and clearly identify the fallback method in the technical audit log.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+18. PEDAGOGICAL ILLUSTRATIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When “Letra bastão + desenho relacionado ao conteúdo” is selected, create or retrieve an educational illustration that is specifically connected to:
+
+• the selected content;
+• the knowledge object;
+• the official skill;
+• the question’s educational purpose.
+
+The illustration must not be:
+
+• a generic icon;
+• an unrelated decorative image;
+• a visual filler;
+• an inaccurate diagram;
+• a copyrighted image reproduced without authorization;
+• an image containing incorrect embedded text;
+• a substitute for curriculum verification.
+
+If AI-generated imagery is available, create a safe service abstraction that records:
+
+• generation request;
+• educational purpose;
+• associated question;
+• responsible user;
+• generation date;
+• generated asset ID;
+• alternative text;
+• review status.
+
+Require Teacher review before final use.
+
+If the image is externally sourced:
+
+• preserve attribution where required;
+• verify usage rights;
+• record the source;
+• avoid unlicensed copyrighted content.
+
+Do not silently generate complex SVG markup through unsafe model output and inject it into the DOM.
+
+Sanitize trusted SVG content or use a safe rendering method.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+19. SUPPORT PROFESSIONAL LOGBOOK AND REPORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Improve ProfissionalApoioView.tsx, RelatorioMensalApoioModal.tsx, and related services.
+
+Allow the Support Professional to link each daily record to:
+
+• the student;
+• the class;
+• the date;
+• the applied activity;
+• the activity version;
+• the curriculum matrix;
+• the curriculum component;
+• the bimester;
+• the thematic unit;
+• the knowledge object;
+• the official skill;
+• the content worked on.
+
+Allow structured registration of:
+
+• attendance;
+• activity started;
+• activity completed;
+• activity completed partially;
+• activity not completed;
+• activity not applied;
+• support level;
+• mediation type;
+• resources used;
+• successful strategies;
+• observed barriers;
+• student response;
+• parts successfully completed;
+• parts not completed;
+• recommendation for the next activity;
+• free-text professional observation.
+
+Support-level options may include:
+
+• realizou com autonomia

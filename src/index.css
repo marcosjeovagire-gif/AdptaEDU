@@ -53,6 +53,106 @@
   width: 100%;
 }
 
+/* Tipografias acessíveis de alto contraste e legibilidade para Dislexia */
+.font-lexend {
+  font-family: 'Lexend', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  letter-spacing: 0.035em !important;
+  word-spacing: 0.075em !important;
+  line-height: 1.72 !important;
+  font-feature-settings: "kern" 1, "liga" 1 !important;
+}
+
+.font-comic-neue {
+  font-family: 'Comic Neue', 'Comic Sans MS', cursive, sans-serif !important;
+  letter-spacing: 0.04em !important;
+  word-spacing: 0.085em !important;
+  line-height: 1.75 !important;
+}
+
+/* Modificadores de espaçamento e tamanho otimizados para Dislexia */
+.dyslexia-spacing {
+  letter-spacing: 0.04em !important;
+  word-spacing: 0.09em !important;
+  line-height: 1.75 !important;
+}
+
+.dyslexia-size-normal {
+  font-size: 13px !important;
+}
+
+.dyslexia-size-ampliada {
+  font-size: 14.5px !important;
+}
+
+.dyslexia-size-grande {
+  font-size: 16px !important;
+}
+
+.dyslexia-fundo-calmo {
+  background-color: #fdfbf7 !important;
+  color: #0f172a !important;
+}
+
+/* Prevenção estrita de cortes de conteúdo em tabelas, linhas e blocos de questões na folha A4 */
+.tabela-adaptada,
+.print-page table,
+#folha-a4-impressao table,
+#folha-pei-impressao table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+}
+
+.tabela-adaptada thead,
+.print-page thead,
+#folha-a4-impressao thead,
+#folha-pei-impressao thead {
+  display: table-header-group !important;
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+}
+
+.tabela-adaptada tbody,
+.print-page tbody,
+#folha-a4-impressao tbody,
+#folha-pei-impressao tbody {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+}
+
+.tabela-adaptada tr,
+.print-page tr,
+#folha-a4-impressao tr,
+#folha-pei-impressao tr {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+}
+
+.tabela-adaptada th,
+.tabela-adaptada td,
+.print-page td, 
+.print-page th,
+#folha-a4-impressao th,
+#folha-a4-impressao td,
+#folha-pei-impressao td,
+#folha-pei-impressao th {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+.questao-container,
+.bloco-questao,
+.break-inside-avoid,
+.cabecalho-a4,
+.assinatura-box,
+.pauta-caligrafica {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+}
+
 @media print {
   body {
     background-color: white !important;
@@ -96,7 +196,7 @@
     overflow: visible !important;
   }
 
-  .print-page, #folha-pei-impressao {
+  .print-page, #folha-a4-impressao, #folha-pei-impressao {
     box-shadow: none !important;
     border: none !important;
     margin: 0 !important;
@@ -106,23 +206,37 @@
     min-height: auto !important;
   }
 
-  /* Garante que tabelas e células do PEI preservem bordas pretas nítidas na impressão */
+  /* Garante que tabelas e células preservem bordas nítidas na impressão */
   .print-page table, 
+  #folha-a4-impressao table,
   #folha-pei-impressao table {
     border-collapse: collapse !important;
     width: 100% !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .print-page tr,
+  #folha-a4-impressao tr,
+  #folha-pei-impressao tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   .print-page td, 
   .print-page th,
+  #folha-a4-impressao td,
+  #folha-a4-impressao th,
   #folha-pei-impressao td,
   #folha-pei-impressao th {
     border-color: #000000 !important;
+    break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
 
   /* Logotipo da escola na impressão A4: pequeno, discreto e proporcional */
   .PeiGeneratorModal .pdf-school-logo,
+  #folha-a4-impressao .pdf-school-logo,
   #folha-pei-impressao .pdf-school-logo {
     max-height: 38px !important;
     max-width: 110px !important;

@@ -19,6 +19,11 @@ import {
 } from './indexedDbService';
 import { uploadImageToDrive, isGoogleDriveConnected } from './googleDriveService';
 import { isRealOnline, adicionarListenerConectividade } from './connectivityService';
+import { 
+  salvarAtividadeNoFirestore, 
+  salvarRegistroApoioNoFirestore, 
+  salvarPeiNoFirestore 
+} from './escolaFirestoreService';
 
 type SyncListener = (status: NetworkSyncStatus) => void;
 
@@ -102,14 +107,17 @@ export async function sincronizarPendenciasFila(): Promise<{
         if (item.entity === 'registro_apoio') {
           const reg: RegistroAcompanhamentoApoio = item.payload;
           
-          // 1. Atualiza registro no IndexedDB para status 'synced'
+          // 1. Sincroniza no Firestore em nuvem
+          await salvarRegistroApoioNoFirestore(reg);
+
+          // 2. Atualiza registro no IndexedDB para status 'synced'
           await salvarRegistroApoioIdb({
             ...reg,
             syncStatus: 'synced',
             updatedAt: new Date().toISOString(),
           }, false);
 
-          // 2. Se houver fotografia do diário de bordo e Google Drive estiver conectado, envia
+          // 3. Se houver fotografia do diário de bordo e Google Drive estiver conectado, envia
           if (reg.fotoDiarioBordoUrl && isGoogleDriveConnected()) {
             try {
               const cleanName = reg.nomeEstudante.replace(/[^a-zA-Z0-9]/g, '_');
@@ -125,7 +133,7 @@ export async function sincronizarPendenciasFila(): Promise<{
             }
           }
 
-          // 3. Remove da fila de sincronização
+          // 4. Remove da fila de sincronização
           await removerItemFilaSincronizacao(item.id);
           sincronizados++;
           itensProcessados.push(item.id);
@@ -139,23 +147,34 @@ export async function sincronizarPendenciasFila(): Promise<{
         } else if (item.entity === 'atividade') {
           const ativ: AtividadeAdaptada = item.payload;
 
-          // 1. Atualiza atividade no IndexedDB para status 'synced'
+          // 1. Sincroniza no Firestore em nuvem
+          await salvarAtividadeNoFirestore(ativ);
+
+          // 2. Atualiza atividade no IndexedDB para status 'synced'
           await salvarAtividadeIdb({
             ...ativ,
             syncStatus: 'synced',
           }, false);
 
-          // 2. Remove da fila de sincronização
+          // 3. Remove da fila de sincronização
           await removerItemFilaSincronizacao(item.id);
           sincronizados++;
           itensProcessados.push(item.id);
 
-          // 3. Dispara evento customizado para que a interface reaja em tempo real
+          // 4. Dispara evento customizado para que a interface reaja em tempo real
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('adaptaedu:atividade_sincronizada', {
               detail: { atividadeId: ativ.id }
             }));
           }
+        } else if (item.entity === 'documento' || item.entity === 'pei') {
+          // Sincroniza PEI no Firestore
+          if (item.payload && (item.payload as any).studentName) {
+            await salvarPeiNoFirestore(item.payload as any);
+          }
+          await removerItemFilaSincronizacao(item.id);
+          sincronizados++;
+          itensProcessados.push(item.id);
         } else {
           // Outras entidades (estudantes, perfis)
           await removerItemFilaSincronizacao(item.id);

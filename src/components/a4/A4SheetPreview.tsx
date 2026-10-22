@@ -14,8 +14,11 @@ import {
   Info,
   Sparkles,
   PenTool,
-  Image as ImageIcon
+  Image as ImageIcon,
+  QrCode,
+  ExternalLink
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import { AtividadeAdaptada, EscolaConfig, QuestaoAdaptada } from '../../types';
 import { InstitutionalLogo } from '../common/InstitutionalLogo';
 import { LogoOlynto } from '../common/LogoOlynto';
@@ -31,6 +34,109 @@ interface A4SheetPreviewProps {
   onSaveAtividade?: (atividade: AtividadeAdaptada) => void;
 }
 
+/**
+ * Renderiza textos e tabelas Markdown nas questões com proteção total contra cortes de linhas e células
+ */
+function renderizarConteudoComTabelas(texto: string, classeTexto: string = '') {
+  if (!texto) return null;
+
+  const linhas = texto.split('\n');
+  const temTabela = linhas.some(l => l.trim().startsWith('|') && l.trim().endsWith('|'));
+
+  if (!temTabela) {
+    return (
+      <div className={`space-y-1.5 ${classeTexto}`}>
+        {linhas.map((linha, idx) => (
+          <p key={idx} className="leading-relaxed">
+            {linha}
+          </p>
+        ))}
+      </div>
+    );
+  }
+
+  // Segmenta em blocos de texto corrido e blocos de tabela estruturada
+  const blocos: Array<{ tipo: 'texto' | 'tabela'; conteudo: string[] }> = [];
+  let blocoAtual: { tipo: 'texto' | 'tabela'; conteudo: string[] } | null = null;
+
+  for (const linha of linhas) {
+    const isLinhaTabela = linha.trim().startsWith('|') && linha.trim().endsWith('|');
+    const tipo = isLinhaTabela ? 'tabela' : 'texto';
+
+    if (!blocoAtual || blocoAtual.tipo !== tipo) {
+      if (blocoAtual) blocos.push(blocoAtual);
+      blocoAtual = { tipo, conteudo: [linha] };
+    } else {
+      blocoAtual.conteudo.push(linha);
+    }
+  }
+  if (blocoAtual) blocos.push(blocoAtual);
+
+  return (
+    <div className={`space-y-2 ${classeTexto}`}>
+      {blocos.map((bloco, bIdx) => {
+        if (bloco.tipo === 'texto') {
+          return (
+            <div key={bIdx} className="space-y-1">
+              {bloco.conteudo.map((l, lIdx) => (
+                <p key={lIdx} className="leading-relaxed">{l}</p>
+              ))}
+            </div>
+          );
+        }
+
+        // Processa as linhas da tabela
+        const linhasTabela = bloco.conteudo.map(l => 
+          l.trim().split('|').slice(1, -1).map(c => c.trim())
+        );
+
+        const cabecalho = linhasTabela[0] || [];
+        const linhasDados = linhasTabela.slice(1).filter(row => 
+          !row.every(cell => /^[-: ]+$/.test(cell))
+        );
+
+        return (
+          <div key={bIdx} className="my-2.5 overflow-x-auto print:overflow-visible break-inside-avoid page-break-inside-avoid w-full">
+            <table className="tabela-adaptada w-full border-collapse border-2 border-slate-700 text-xs break-inside-avoid page-break-inside-avoid shadow-2xs">
+              {cabecalho.length > 0 && (
+                <thead className="bg-slate-100 border-b-2 border-slate-700 break-inside-avoid page-break-inside-avoid">
+                  <tr className="break-inside-avoid page-break-inside-avoid">
+                    {cabecalho.map((col, cIdx) => (
+                      <th
+                        key={cIdx}
+                        className="border border-slate-700 px-3 py-1.5 text-left font-bold text-slate-900 uppercase text-[11px] tracking-wide break-inside-avoid page-break-inside-avoid break-words"
+                      >
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+              )}
+              <tbody className="break-inside-avoid page-break-inside-avoid">
+                {linhasDados.map((row, rIdx) => (
+                  <tr
+                    key={rIdx}
+                    className={`break-inside-avoid page-break-inside-avoid ${rIdx % 2 === 1 ? 'bg-slate-50/70' : 'bg-white'}`}
+                  >
+                    {row.map((cell, cIdx) => (
+                      <td
+                        key={cIdx}
+                        className="border border-slate-400 px-3 py-1.5 text-slate-800 text-xs font-medium break-inside-avoid page-break-inside-avoid break-words"
+                      >
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
   atividade,
   escolaConfig,
@@ -44,11 +150,58 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
   const [exportandoPdf, setExportandoPdf] = useState<boolean>(false);
   const [pdfExportadoSucesso, setPdfExportadoSucesso] = useState<string | null>(null);
   const [pdfExportadoErro, setPdfExportadoErro] = useState<string | null>(null);
+
+  // Configurações refinadas de A4 e Acessibilidade para Dislexia (10mm estrito e fontes com alto contraste)
+  const [margemA4, setMargemA4] = useState<'10mm' | '15mm'>('10mm');
+  const [fonteAcessivel, setFonteAcessivel] = useState<'padrao' | 'lexend' | 'comic_neue'>('lexend');
+  const [tamanhoFonte, setTamanhoFonte] = useState<'normal' | 'ampliada' | 'grande'>('normal');
+  const [espacamentoDislexia, setEspacamentoDislexia] = useState<boolean>(true);
+  const [fundoCalmo, setFundoCalmo] = useState<boolean>(false);
+  const [modalHistoricoVersoes, setModalHistoricoVersoes] = useState<boolean>(false);
   
+  // Geração Automática de QR Code Vinculado ao ID da Atividade Adaptada
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  const [copiadoLink, setCopiadoLink] = useState<boolean>(false);
+  const [modalQrCode, setModalQrCode] = useState<boolean>(false);
+
   // Estado Offline-First
   const [isOnline, setIsOnline] = useState<boolean>(() => getIsOnline());
   const [salvandoOffline, setSalvandoOffline] = useState<boolean>(false);
   const [mensagemOffline, setMensagemOffline] = useState<string | null>(null);
+
+  // Gera automaticamente o QR Code vinculado ao ID de cada atividade adaptada
+  useEffect(() => {
+    if (!atividadeAtual?.id) return;
+    const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://adaptaedu.seduc.go.gov.br';
+    const path = typeof window !== 'undefined' && window.location.pathname ? window.location.pathname : '/';
+    const urlDigital = `${origin}${path}?view=atividade&id=${encodeURIComponent(atividadeAtual.id)}`;
+
+    QRCode.toDataURL(urlDigital, {
+      width: 160,
+      margin: 1,
+      color: {
+        dark: '#0f172a',
+        light: '#ffffff',
+      },
+      errorCorrectionLevel: 'M',
+    })
+      .then((url) => setQrCodeDataUrl(url))
+      .catch((err) => console.warn('[QR Code] Erro ao gerar código da atividade:', err));
+  }, [atividadeAtual?.id]);
+
+  // Pré-carrega fontes para renderização impecável (evita fallback indesejado no html2canvas e print)
+  useEffect(() => {
+    if (typeof document !== 'undefined' && 'fonts' in document) {
+      Promise.allSettled([
+        document.fonts.load('400 14px Lexend'),
+        document.fonts.load('500 14px Lexend'),
+        document.fonts.load('600 14px Lexend'),
+        document.fonts.load('700 14px Lexend'),
+        document.fonts.load('400 14px "Comic Neue"'),
+        document.fonts.load('700 14px "Comic Neue"'),
+      ]).catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     setAtividadeAtual(atividade);
@@ -196,22 +349,148 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
             Pré-visualização Folha A4
           </span>
 
+          {/* Versão da Atividade */}
+          {atividadeAtual.versao && atividadeAtual.versao > 1 ? (
+            <button
+              onClick={() => setModalHistoricoVersoes(true)}
+              className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-100 border border-indigo-300 font-extrabold text-indigo-900 flex items-center gap-1 cursor-pointer hover:bg-indigo-200 transition-colors"
+              title="Clique para ver o histórico de adaptações desta atividade"
+            >
+              <span>v{atividadeAtual.versao} (Adaptada)</span>
+              <Sparkles className="h-3 w-3 text-indigo-700" />
+            </button>
+          ) : (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 font-semibold text-slate-700">
+              v1 (Original)
+            </span>
+          )}
+
+          {/* Seletor de Margens (10mm padrão inclusivo SEDUC-GO vs 15mm) */}
+          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+            <button
+              onClick={() => setMargemA4('10mm')}
+              className={`px-2 py-0.5 text-[11px] font-bold rounded cursor-pointer transition-colors ${
+                margemA4 === '10mm' ? 'bg-emerald-700 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Margens estritas de 10mm (190mm de área útil conforme diretrizes SEDUC-GO)"
+            >
+              10 mm (Padrão)
+            </button>
+            <button
+              onClick={() => setMargemA4('15mm')}
+              className={`px-2 py-0.5 text-[11px] font-bold rounded cursor-pointer transition-colors ${
+                margemA4 === '15mm' ? 'bg-emerald-700 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Margens ampliadas de 15mm"
+            >
+              15 mm
+            </button>
+          </div>
+
+          {/* Seletor de Fonte para Dislexia e Acessibilidade */}
+          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+            <span className="text-[10px] text-slate-500 font-bold px-1.5">Tipografia:</span>
+            <button
+              onClick={() => setFonteAcessivel('lexend')}
+              className={`px-2 py-0.5 text-[11px] font-bold rounded cursor-pointer transition-colors ${
+                fonteAcessivel === 'lexend' ? 'bg-indigo-700 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Fonte Lexend: tipografia recomendada cientificamente para dislexia e fluência leitora"
+            >
+              Lexend (Dislexia)
+            </button>
+            <button
+              onClick={() => setFonteAcessivel('comic_neue')}
+              className={`px-2 py-0.5 text-[11px] font-bold rounded cursor-pointer transition-colors ${
+                fonteAcessivel === 'comic_neue' ? 'bg-indigo-700 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Fonte Comic Neue: caracteres abertos e contrastados para dislexia"
+            >
+              Comic Neue
+            </button>
+            <button
+              onClick={() => setFonteAcessivel('padrao')}
+              className={`px-2 py-0.5 text-[11px] font-bold rounded cursor-pointer transition-colors ${
+                fonteAcessivel === 'padrao' ? 'bg-indigo-700 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Fonte padrão do sistema"
+            >
+              Padrão
+            </button>
+          </div>
+
+          {/* Seletor de Escala da Fonte para Dislexia / Baixa Visão */}
+          <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+            <span className="text-[10px] text-slate-500 font-bold px-1.5">Tamanho:</span>
+            <button
+              onClick={() => setTamanhoFonte('normal')}
+              className={`px-1.5 py-0.5 text-[10.5px] font-bold rounded cursor-pointer transition-colors ${
+                tamanhoFonte === 'normal' ? 'bg-slate-700 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Tamanho padrão: 13px"
+            >
+              13px
+            </button>
+            <button
+              onClick={() => setTamanhoFonte('ampliada')}
+              className={`px-1.5 py-0.5 text-[10.5px] font-bold rounded cursor-pointer transition-colors ${
+                tamanhoFonte === 'ampliada' ? 'bg-slate-700 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Tamanho ampliado: 14.5px (Recomendado para dislexia e TDAH)"
+            >
+              14.5px
+            </button>
+            <button
+              onClick={() => setTamanhoFonte('grande')}
+              className={`px-1.5 py-0.5 text-[10.5px] font-bold rounded cursor-pointer transition-colors ${
+                tamanhoFonte === 'grande' ? 'bg-slate-700 text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Tamanho grande: 16px (Baixa visão ou adaptação severa)"
+            >
+              16px
+            </button>
+          </div>
+
+          {/* Toggle de Espaçamento Dislexia */}
+          <button
+            onClick={() => setEspacamentoDislexia(prev => !prev)}
+            className={`px-2 py-0.5 text-[11px] font-bold rounded-lg border cursor-pointer transition-colors flex items-center gap-1 ${
+              espacamentoDislexia 
+                ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-2xs' 
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+            title="Espaçamento generoso entre letras, palavras e linhas para facilitar o rastreamento visual"
+          >
+            <span>Espaçamento Dislexia</span>
+            {espacamentoDislexia && <span className="text-[9px] bg-amber-200 px-1 rounded font-mono">ON</span>}
+          </button>
+
+          {/* Toggle de Papel Calmo (Anti-reflexo / Redução de Fadiga) */}
+          <button
+            onClick={() => setFundoCalmo(prev => !prev)}
+            className={`px-2 py-0.5 text-[11px] font-bold rounded-lg border cursor-pointer transition-colors flex items-center gap-1 ${
+              fundoCalmo 
+                ? 'bg-amber-50 border-amber-400 text-amber-900 shadow-2xs' 
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+            title="Papel tom marfim/creme suave para redução do estresse visual e ofuscamento (Efeito Meares-Irlen)"
+          >
+            <span>Fundo Conforto</span>
+            {fundoCalmo && <span className="text-[9px] bg-amber-200 px-1 rounded font-mono">ON</span>}
+          </button>
+
           {/* Indicador de Status Offline-First */}
           {isOnline ? (
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-300 font-bold text-emerald-800 flex items-center gap-1 shadow-2xs" title="Conexão ativa e IndexedDB sincronizado">
               <Wifi className="h-3 w-3 text-emerald-600" />
-              <span>Online • IndexedDB</span>
+              <span>Online</span>
             </span>
           ) : (
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-300 font-bold text-amber-900 flex items-center gap-1 shadow-2xs" title="Modo Offline-first: alterações gravadas no IndexedDB">
               <WifiOff className="h-3 w-3 text-amber-700" />
-              <span>Offline-First (IndexedDB Ativo)</span>
+              <span>Offline</span>
             </span>
           )}
-
-          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 font-semibold text-slate-700">
-            Margens: 15 mm
-          </span>
 
           {atividadeAtual.alinhadaAoPei ? (
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 border border-emerald-300 font-extrabold text-emerald-800 flex items-center gap-1">
@@ -226,6 +505,15 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <button
+            onClick={() => setModalQrCode(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
+            title="Visualizar QR Code e link de acesso rápido à versão digital desta atividade"
+          >
+            <QrCode className="h-3.5 w-3.5 text-indigo-600" />
+            <span>QR Digital</span>
+          </button>
+
           <button
             onClick={handleCopiarTexto}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
@@ -291,6 +579,19 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
         </div>
       )}
 
+      {/* Alerta de Feedback de Cópia do Link Digital */}
+      {copiadoLink && (
+        <div className="no-print w-full max-w-4xl mb-4 p-3 bg-indigo-50 border border-indigo-300 rounded-xl text-xs font-bold text-indigo-900 flex items-center justify-between animate-fadeIn shadow-2xs">
+          <div className="flex items-center gap-2">
+            <Check className="h-4 w-4 text-indigo-700 shrink-0" />
+            <span>Link da versão digital copiado com sucesso! (ID: {atividadeAtual.id})</span>
+          </div>
+          <span className="text-[10px] font-mono bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">
+            QR Digital Vinculado
+          </span>
+        </div>
+      )}
+
       {pdfExportadoErro && (
         <div className="no-print w-full max-w-4xl mb-4 p-3 bg-rose-50 border border-rose-300 rounded-xl text-xs font-bold text-rose-900 flex items-center justify-between animate-fadeIn shadow-2xs">
           <span>{pdfExportadoErro}</span>
@@ -346,14 +647,51 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
         </div>
       </div>
 
-      {/* FOLHA A4 FÍSICA / IMPRESSÃO */}
+      {/* FOLHA A4 FÍSICA / IMPRESSÃO COM MARGENS DE 10MM E FONTES ACESSÍVEIS */}
       <div
         id="folha-a4-impressao"
-        className="print-page w-full max-w-[820px] bg-white text-slate-900 border border-slate-300 shadow-md rounded-none mb-12 p-[15mm] text-[13px] leading-relaxed"
-        style={{ minHeight: '1120px' }}
+        className={`print-page w-full max-w-[210mm] border border-slate-300 shadow-md rounded-none mb-12 leading-relaxed transition-all mx-auto ${
+          fundoCalmo ? 'dyslexia-fundo-calmo' : 'bg-white text-slate-900'
+        } ${
+          margemA4 === '10mm' ? 'p-[10mm]' : 'p-[15mm]'
+        } ${
+          fonteAcessivel === 'lexend'
+            ? 'font-lexend tracking-wide'
+            : fonteAcessivel === 'comic_neue'
+            ? 'font-comic-neue tracking-wider'
+            : 'font-sans'
+        } ${
+          espacamentoDislexia ? 'dyslexia-spacing' : ''
+        } ${
+          tamanhoFonte === 'ampliada'
+            ? 'dyslexia-size-ampliada'
+            : tamanhoFonte === 'grande'
+            ? 'dyslexia-size-grande'
+            : 'dyslexia-size-normal'
+        } ${
+          atividadeAtual.formatoLetra === 'bastao' ||
+          atividadeAtual.usarCaixaAlta ||
+          atividadeAtual.estiloTipograficoVisual === 'letra_bastao' ||
+          atividadeAtual.estiloTipograficoVisual === 'letra_bastao_desenho_matriz' ||
+          atividadeAtual.estiloTipograficoVisual === 'so_desenhos'
+            ? 'uppercase tracking-wider'
+            : ''
+        }`}
+        style={{
+          width: '100%',
+          maxWidth: '210mm',
+          minHeight: '297mm',
+          boxSizing: 'border-box',
+          padding: margemA4 === '10mm' ? '10mm' : '15mm',
+          fontFamily: fonteAcessivel === 'lexend' 
+            ? "'Lexend', sans-serif" 
+            : fonteAcessivel === 'comic_neue' 
+            ? "'Comic Neue', 'Comic Sans MS', sans-serif" 
+            : undefined
+        }}
       >
         {/* CABEÇALHO OFICIAL INSTITUCIONAL A4 OTIMIZADO */}
-        <div className="border border-slate-700 p-2.5 sm:p-3 mb-3.5 rounded-none">
+        <div className="cabecalho-a4 break-inside-avoid page-break-inside-avoid border border-slate-700 p-2.5 sm:p-3 mb-3.5 rounded-none">
           {/* Logo Pequeno no Canto Esquerdo + Título e Metadados Alinhados */}
           <div className="w-full pb-2.5 border-b border-slate-300 flex items-start justify-between gap-3">
             <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -375,9 +713,45 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
                 </span>
               </div>
             </div>
-            <div className="border border-slate-400 px-3 py-1 text-center shrink-0 min-w-[70px] bg-slate-50/50 self-start">
-              <span className="text-[8.5px] font-bold uppercase text-slate-600 block">Nota / Visto</span>
-              <span className="text-[11px] font-mono text-slate-400">______</span>
+            {/* Bloco Superior Direito: QR Code da Versão Digital + Caixa Nota/Visto */}
+            <div className="flex items-center gap-2 shrink-0 self-start">
+              {/* QR Code Automático Vinculado ao ID da Atividade */}
+              <div 
+                className="border border-slate-600 p-1 bg-white text-center rounded-none shadow-2xs flex flex-col items-center justify-center cursor-pointer hover:border-indigo-600 transition-colors"
+                title={`QR Code da Versão Digital\nID: ${atividadeAtual.id}\nClique para copiar o link direto da versão digital.`}
+                onClick={() => {
+                  const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://adaptaedu.seduc.go.gov.br';
+                  const path = typeof window !== 'undefined' && window.location.pathname ? window.location.pathname : '/';
+                  const url = `${origin}${path}?view=atividade&id=${encodeURIComponent(atividadeAtual.id)}`;
+                  navigator.clipboard.writeText(url);
+                  setCopiadoLink(true);
+                  setTimeout(() => setCopiadoLink(false), 2500);
+                }}
+              >
+                {qrCodeDataUrl ? (
+                  <img
+                    src={qrCodeDataUrl}
+                    alt={`QR Code Atividade ${atividadeAtual.id}`}
+                    className="w-11 h-11 object-contain block"
+                  />
+                ) : (
+                  <div className="w-11 h-11 bg-slate-100 flex items-center justify-center">
+                    <QrCode className="w-5 h-5 text-slate-400" />
+                  </div>
+                )}
+                <span className="text-[7px] font-mono font-bold text-slate-900 leading-tight block mt-0.5 uppercase tracking-tighter">
+                  QR Digital
+                </span>
+                <span className="text-[6.5px] font-mono text-slate-500 leading-tight block truncate max-w-[50px]">
+                  {atividadeAtual.id.length > 8 ? atividadeAtual.id.slice(0, 8) : atividadeAtual.id}
+                </span>
+              </div>
+
+              {/* Caixa de Nota / Visto */}
+              <div className="border border-slate-400 px-2.5 py-1 text-center shrink-0 min-w-[65px] bg-slate-50/50 self-stretch flex flex-col justify-center">
+                <span className="text-[8.5px] font-bold uppercase text-slate-600 block">Nota / Visto</span>
+                <span className="text-[11px] font-mono text-slate-400 mt-1">______</span>
+              </div>
             </div>
           </div>
 
@@ -500,57 +874,60 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
 
         {/* QUESTÕES */}
         <div className="space-y-5 pt-1">
-          {atividadeAtual.questoes.map((q) => (
-            <div key={q.id} className="pb-3 border-b border-slate-200 last:border-b-0 break-inside-avoid">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="flex-1">
-                  {editandoQuestaoId === q.id ? (
-                    <div className="space-y-2">
-                      <textarea
-                        value={enunciadoEditado}
-                        onChange={(e) => setEnunciadoEditado(e.target.value)}
-                        className="w-full p-2 border border-emerald-600 rounded text-xs bg-white"
-                        rows={3}
-                        autoFocus
-                      />
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => salvarEdicao(q)}
-                          disabled={salvandoOffline}
-                          className="px-2.5 py-1 bg-emerald-700 text-white rounded text-xs font-bold hover:bg-emerald-800 flex items-center gap-1 cursor-pointer disabled:opacity-60"
-                        >
-                          {salvandoOffline ? (
-                            <>
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                              <span>Salvando no IndexedDB...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Save className="h-3 w-3" />
-                              <span>Salvar (Offline-First)</span>
-                            </>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => setEditandoQuestaoId(null)}
-                          className="px-2.5 py-1 bg-slate-200 text-slate-700 rounded text-xs hover:bg-slate-300 cursor-pointer"
-                        >
-                          Cancelar
-                        </button>
+          {atividadeAtual.questoes.map((q) => {
+            const isCaixaAlta =
+              atividadeAtual.formatoLetra === 'bastao' ||
+              atividadeAtual.usarCaixaAlta ||
+              atividadeAtual.estiloTipograficoVisual === 'letra_bastao' || 
+              atividadeAtual.estiloTipograficoVisual === 'letra_bastao_desenho_matriz' ||
+              atividadeAtual.estiloTipograficoVisual === 'so_desenhos';
+
+            return (
+              <div key={q.id} className="questao-container bloco-questao pb-3.5 border-b border-slate-200 last:border-b-0 break-inside-avoid page-break-inside-avoid">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex-1">
+                    {editandoQuestaoId === q.id ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={enunciadoEditado}
+                          onChange={(e) => setEnunciadoEditado(e.target.value)}
+                          className="w-full p-2 border border-emerald-600 rounded text-xs bg-white"
+                          rows={3}
+                          autoFocus
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => salvarEdicao(q)}
+                            disabled={salvandoOffline}
+                            className="px-2.5 py-1 bg-emerald-700 text-white rounded text-xs font-bold hover:bg-emerald-800 flex items-center gap-1 cursor-pointer disabled:opacity-60"
+                          >
+                            {salvandoOffline ? (
+                              <>
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span>Salvando no IndexedDB...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Save className="h-3 w-3" />
+                                <span>Salvar (Offline-First)</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setEditandoQuestaoId(null)}
+                            className="px-2.5 py-1 bg-slate-200 text-slate-700 rounded text-xs hover:bg-slate-300 cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <p className={`font-semibold text-slate-900 ${
-                      atividadeAtual.estiloTipograficoVisual === 'letra_bastao' || 
-                      atividadeAtual.estiloTipograficoVisual === 'letra_bastao_desenho_matriz' ||
-                      atividadeAtual.estiloTipograficoVisual === 'so_desenhos'
-                        ? 'font-bold font-sans uppercase tracking-wide'
-                        : ''
-                    }`}>
-                      {q.enunciado}
-                    </p>
-                  )}
-                </div>
+                    ) : (
+                      renderizarConteudoComTabelas(
+                        q.enunciado,
+                        `font-semibold text-slate-900 ${isCaixaAlta ? 'font-bold uppercase tracking-wider' : ''}`
+                      )
+                    )}
+                  </div>
 
                 <button
                   onClick={() => {
@@ -641,10 +1018,12 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
                     <div key={altIdx} className="flex items-center gap-2">
                       <div className="h-4 w-4 rounded-none border border-slate-600 shrink-0" />
                       <span className={`text-slate-800 text-[12.5px] ${
+                        atividadeAtual.formatoLetra === 'bastao' ||
+                        atividadeAtual.usarCaixaAlta ||
                         atividadeAtual.estiloTipograficoVisual === 'letra_bastao' || 
                         atividadeAtual.estiloTipograficoVisual === 'letra_bastao_desenho_matriz' ||
                         atividadeAtual.estiloTipograficoVisual === 'so_desenhos'
-                          ? 'font-bold font-sans uppercase tracking-wide'
+                          ? "font-bold uppercase tracking-wider"
                           : ''
                       }`}>
                         {alt}
@@ -663,11 +1042,12 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
                 </div>
               )}
             </div>
-          ))}
+          );
+        })}
         </div>
 
         {/* ASSINATURA DO PROFESSOR */}
-        <div className="mt-8 pt-3 border-t border-slate-400 break-inside-avoid">
+        <div className="assinatura-box mt-8 pt-3 border-t border-slate-400 break-inside-avoid page-break-inside-avoid">
           <div className="w-64 mx-auto text-center">
             <div className="border-b border-slate-600 h-5 mb-1" />
             <p className="font-bold text-xs text-slate-800">{atividadeAtual.professorNome}</p>
@@ -685,6 +1065,160 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* MODAL DE HISTÓRICO DE VERSÕES E RASTREABILIDADE */}
+      {modalHistoricoVersoes && (
+        <div className="no-print fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden flex flex-col animate-scaleUp">
+            <div className="p-4 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-indigo-700" />
+                <h3 className="text-sm font-extrabold text-slate-900">
+                  Histórico de Versões da Atividade
+                </h3>
+              </div>
+              <button
+                onClick={() => setModalHistoricoVersoes(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto text-xs text-slate-700">
+              <p className="text-slate-500 text-[11px]">
+                Conforme as normas de inclusão da SEDUC-GO, a atividade original é rigorosamente mantida e novas versões adaptadas registram a evolução pedagógica:
+              </p>
+
+              <div className="space-y-2">
+                {(atividadeAtual.historicoVersoes && atividadeAtual.historicoVersoes.length > 0) ? (
+                  atividadeAtual.historicoVersoes.map((v, idx) => (
+                    <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="text-indigo-800">Versão {v.versao}</span>
+                        <span className="text-slate-400 text-[10px]">{v.data}</span>
+                      </div>
+                      <p className="text-slate-800 font-medium">{v.alteracoes}</p>
+                      <p className="text-slate-500 text-[10px]">Autor: {v.autor} • Motivo: {v.motivo}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="text-indigo-800">Versão 1 (Original)</span>
+                      <span className="text-slate-400 text-[10px]">{atividadeAtual.dataCriacao}</span>
+                    </div>
+                    <p className="text-slate-800 font-medium">Versão inicial gerada com base na Matriz Curricular SEDUC-GO.</p>
+                    <p className="text-slate-500 text-[10px]">Autor: {atividadeAtual.professorNome}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                onClick={() => setModalHistoricoVersoes(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE VISUALIZAÇÃO E COMPARTILHAMENTO DO QR CODE DIGITAL */}
+      {modalQrCode && (
+        <div className="no-print fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden flex flex-col animate-scaleUp">
+            <div className="p-4 bg-indigo-50 border-b border-indigo-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <QrCode className="h-5 w-5 text-indigo-700" />
+                <h3 className="text-sm font-extrabold text-slate-900">
+                  QR Code da Versão Digital
+                </h3>
+              </div>
+              <button
+                onClick={() => setModalQrCode(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 flex flex-col items-center text-center space-y-4">
+              <div className="p-3 bg-white border-2 border-slate-700 rounded-xl shadow-md">
+                {qrCodeDataUrl ? (
+                  <img
+                    src={qrCodeDataUrl}
+                    alt={`QR Code da Atividade ${atividadeAtual.id}`}
+                    className="w-48 h-48 object-contain"
+                  />
+                ) : (
+                  <div className="w-48 h-48 bg-slate-100 flex items-center justify-center rounded-lg">
+                    <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[11px] font-mono font-bold text-indigo-900 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-200 inline-block">
+                  ID: {atividadeAtual.id}
+                </span>
+                <h4 className="text-sm font-bold text-slate-900 pt-1">
+                  {atividadeAtual.disciplina} • {atividadeAtual.turma}
+                </h4>
+                <p className="text-xs text-slate-600">
+                  Estudante: <strong>{atividadeAtual.estudanteNome}</strong>
+                </p>
+                <p className="text-[11px] text-slate-500 pt-1 leading-snug">
+                  Este QR Code é gerado automaticamente no topo da folha A4 e permite que professores, mediadores e coordenação acessem a versão digital com um toque na câmera do celular.
+                </p>
+              </div>
+
+              <div className="w-full flex items-center gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://adaptaedu.seduc.go.gov.br';
+                    const path = typeof window !== 'undefined' && window.location.pathname ? window.location.pathname : '/';
+                    const url = `${origin}${path}?view=atividade&id=${encodeURIComponent(atividadeAtual.id)}`;
+                    navigator.clipboard.writeText(url);
+                    setCopiadoLink(true);
+                    setTimeout(() => setCopiadoLink(false), 2500);
+                  }}
+                  className="flex-1 py-2 px-3 bg-indigo-700 hover:bg-indigo-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                >
+                  {copiadoLink ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+                  <span>{copiadoLink ? 'Link Copiado!' : 'Copiar Link'}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const origin = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://adaptaedu.seduc.go.gov.br';
+                    const path = typeof window !== 'undefined' && window.location.pathname ? window.location.pathname : '/';
+                    const url = `${origin}${path}?view=atividade&id=${encodeURIComponent(atividadeAtual.id)}`;
+                    window.open(url, '_blank');
+                  }}
+                  className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                  title="Abrir versão digital em nova aba"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>Abrir</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                onClick={() => setModalQrCode(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

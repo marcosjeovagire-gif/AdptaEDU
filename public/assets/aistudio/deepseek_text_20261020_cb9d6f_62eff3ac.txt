@@ -1,0 +1,559 @@
+===INÍCIO===
+
+# PAPEL
+
+Você é um engenheiro sênior de software especialista em React + TypeScript, geração de PDFs com jsPDF e aplicações web de produção para redes de ensino (SEDUC-GO). Sua missão é entregar código de qualidade produção, tipado em `strict`, testável e seguro para deploy em rede.
+
+# CONTEXTO
+
+App: **AdaptaEdu Escolar** — sistema oficial de atividades pedagógicas adaptadas para educação especial (SEDUC-GO). React + TypeScript. Será publicado e usado por múltiplos usuários simultâneos via navegador.
+
+Arquivo alvo: `src/services/dashboardPdfService.ts` — gera o "Relatório de Progresso e Engajamento dos Estudantes" em PDF via `jsPDF`. É documento oficial: layout e textos NÃO podem mudar.
+
+# ARQUIVO ATUAL (a corrigir)
+
+```typescript
+import { jsPDF } from 'jspdf';
+import { 
+  AtividadeAdaptada, 
+  Estudante, 
+  EscolaConfig, 
+  AuthorizedUser, 
+  RegistroAcompanhamentoApoio,
+  PerfilPedagogico 
+} from '../types';
+import { getLogoEscolaBase64 } from '../assets/branding/logoEscolaBase64';
+import { sanitizarNomeArquivo } from './atividadeA4PdfService';
+
+export interface ParametrosExportacaoDashboard {
+  escolaConfig?: Partial<EscolaConfig>;
+  turmaSelecionada: string;
+  periodoDescricao: string;
+  dataInicio?: string;
+  dataFim?: string;
+  estudantes: Estudante[];
+  atividades: AtividadeAdaptada[];
+  registrosApoio?: RegistroAcompanhamentoApoio[];
+  perfisPedagogicos?: PerfilPedagogico[];
+  currentUser: AuthorizedUser | null;
+}
+
+export interface MetricasAlunoDashboard {
+  estudante: Estudante;
+  totalAtividades: number;
+  atividadesConcluidas: number;
+  taxaConclusao: number;
+  alinhadasAoPei: number;
+  nivelEngajamento: string;
+  formatoLetra: 'bastao' | 'cursiva';
+  ultimaAtividadeData?: string;
+}
+
+export function calcularMetricasEstudantes(
+  estudantes: Estudante[],
+  atividades: AtividadeAdaptada[],
+  registrosApoio: RegistroAcompanhamentoApoio[] = [],
+  turmaFiltro: string = 'todas',
+  dataInicio?: string,
+  dataFim?: string
+): {
+  alunosMetricas: MetricasAlunoDashboard[];
+  resumoGeral: {
+    totalAlunos: number;
+    totalAtividades: number;
+    totalConcluidas: number;
+    taxaMediaConclusao: number;
+    taxaAlinhamentoPei: number;
+    turmasPresentes: string[];
+  };
+} {
+  const atividadesFiltradas = atividades.filter(ativ => {
+    if (turmaFiltro !== 'todas' && ativ.turma !== turmaFiltro) return false;
+    if (dataInicio || dataFim) {
+      const ativData = ativ.dataCriacao || '';
+      let dataIso = '';
+      if (ativData.includes('/')) {
+        const [d, m, y] = ativData.split('/');
+        dataIso = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      } else {
+        dataIso = ativData;
+      }
+      if (dataInicio && dataIso < dataInicio) return false;
+      if (dataFim && dataIso > dataFim) return false;
+    }
+    return true;
+  });
+
+  const estudantesFiltrados = estudantes.filter(e => {
+    if (turmaFiltro === 'todas') return true;
+    return e.turma === turmaFiltro || e.anoSerie === turmaFiltro;
+  });
+
+  const alunosMetricas: MetricasAlunoDashboard[] = estudantesFiltrados.map(est => {
+    const ativsDoAluno = atividadesFiltradas.filter(a => a.estudanteId === est.id);
+    const concluidas = ativsDoAluno.filter(a => a.status === 'Revisada' || (a as any).concluida === true);
+    const alinhadasPei = ativsDoAluno.filter(a => a.alinhadaAoPei);
+    const taxa = ativsDoAluno.length > 0 ? Math.round((concluidas.length / ativsDoAluno.length) * 100) : 0;
+
+    const logsAluno = registrosApoio.filter(r => r.studentId === est.id);
+    let nivelEngajamento = 'Participativo';
+    if (logsAluno.length > 0) {
+      const comDificuldade = logsAluno.filter(l => 
+        l.conseguiuRealizarAtividade === 'Não' || 
+        l.conseguiuRealizarAtividade === 'Parcialmente' || 
+        l.demonstrouIrritabilidadeOuSinais === 'Sim' || 
+        l.nivelAutonomia === 'Com Mediação Física/Visual' || 
+        l.nivelAutonomia === 'Não Realizou'
+      ).length;
+      if (comDificuldade > logsAluno.length / 2) nivelEngajamento = 'Apoio Constante';
+      else if (comDificuldade > 0) nivelEngajamento = 'Mediação Pontual';
+      else nivelEngajamento = 'Autônomo c/ Apoio';
+    } else if (taxa >= 80) {
+      nivelEngajamento = 'Alto Engajamento';
+    } else if (taxa >= 40) {
+      nivelEngajamento = 'Médio Engajamento';
+    } else if (ativsDoAluno.length > 0) {
+      nivelEngajamento = 'Necessita Estímulo';
+    } else {
+      nivelEngajamento = 'Sem Atividades';
+    }
+
+    const laudoLow = `${est.laudo || ''} ${est.observacoesAcessibilidade || ''}`.toLowerCase();
+    const formatoLetra: 'bastao' | 'cursiva' = 
+      (est as any).formatoLetra === 'cursiva' ? 'cursiva' :
+      (laudoLow.includes('tea') || laudoLow.includes('intelect') || laudoLow.includes('motora') || laudoLow.includes('disgraf') ? 'bastao' : 'bastao');
+
+    const ultimaData = ativsDoAluno.length > 0 ? ativsDoAluno[ativsDoAluno.length - 1].dataCriacao : undefined;
+
+    return {
+      estudante: est,
+      totalAtividades: ativsDoAluno.length,
+      atividadesConcluidas: concluidas.length,
+      taxaConclusao: taxa,
+      alinhadasAoPei: alinhadasPei.length,
+      nivelEngajamento,
+      formatoLetra,
+      ultimaAtividadeData: ultimaData,
+    };
+  });
+
+  const totalAtividades = atividadesFiltradas.length;
+  const totalConcluidas = atividadesFiltradas.filter(a => a.status === 'Revisada' || (a as any).concluida === true).length;
+  const totalAlinhadas = atividadesFiltradas.filter(a => a.alinhadaAoPei).length;
+  const taxaMediaConclusao = totalAtividades > 0 ? Math.round((totalConcluidas / totalAtividades) * 100) : 0;
+  const taxaAlinhamentoPei = totalAtividades > 0 ? Math.round((totalAlinhadas / totalAtividades) * 100) : 0;
+  const turmasPresentes = Array.from(new Set(estudantesFiltrados.map(e => e.turma || e.anoSerie || 'Não informada'))).sort();
+
+  return {
+    alunosMetricas,
+    resumoGeral: {
+      totalAlunos: estudantesFiltrados.length,
+      totalAtividades,
+      totalConcluidas,
+      taxaMediaConclusao,
+      taxaAlinhamentoPei,
+      turmasPresentes,
+    },
+  };
+}
+
+export async function exportarRelatorioProgressoPdf(
+  params: ParametrosExportacaoDashboard
+): Promise<{ success: boolean; fileName: string }> {
+  const {
+    escolaConfig, turmaSelecionada, periodoDescricao, dataInicio, dataFim,
+    estudantes, atividades, registrosApoio = [], currentUser,
+  } = params;
+
+  const { alunosMetricas, resumoGeral } = calcularMetricasEstudantes(
+    estudantes, atividades, registrosApoio, turmaSelecionada, dataInicio, dataFim
+  );
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const marginX = 14;
+  const contentWidth = pageWidth - marginX * 2;
+  let currentY = 12;
+
+  const renderMiniCabecalho = () => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(
+      `${escolaConfig?.nome || 'Colégio Estadual Olynto Pereira de Castro'} • Relatório Analítico de Progresso (${turmaSelecionada === 'todas' ? 'Todas as Turmas' : turmaSelecionada})`,
+      marginX, currentY
+    );
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.2);
+    doc.line(marginX, currentY + 2, pageWidth - marginX, currentY + 2);
+    currentY += 7;
+  };
+
+  const checkPageBreak = (neededHeight: number) => {
+    if (currentY + neededHeight > pageHeight - 16) {
+      doc.addPage();
+      currentY = 12;
+      renderMiniCabecalho();
+    }
+  };
+
+  const headerHeight = 24;
+  doc.setDrawColor(51, 65, 85);
+  doc.setLineWidth(0.35);
+  doc.setFillColor(255, 255, 255);
+  doc.rect(marginX, currentY, contentWidth, headerHeight, 'FD');
+
+  const logoBase64 = getLogoEscolaBase64();
+  let textStartX = marginX + 3;
+  if (logoBase64 && logoBase64.startsWith('data:image')) {
+    try {
+      doc.addImage(logoBase64, 'PNG', marginX + 2, currentY + 2, 28, 9, undefined, 'FAST');
+      textStartX = marginX + 33;
+    } catch { textStartX = marginX + 3; }
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text((escolaConfig?.nome || 'COLÉGIO ESTADUAL OLYNTO PEREIRA DE CASTRO').toUpperCase(), textStartX, currentY + 4.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`${escolaConfig?.municipio || 'Goiás'} • SEDUC-GO • Sistema de Atividades Pedagógicas Adaptadas`, textStartX, currentY + 8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(6, 95, 70);
+  doc.text('RELATÓRIO DE PROGRESSO E ENGAJAMENTO DOS ESTUDANTES', textStartX, currentY + 13.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  const dataEmissao = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  doc.text(`Emissão: ${dataEmissao} | Responsável: ${currentUser?.name || 'Coordenação Pedagógica'}`, textStartX, currentY + 17.5);
+
+  currentY += headerHeight + 3.5;
+
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.rect(marginX, currentY, contentWidth, 12, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(30, 41, 59);
+  doc.text('PARÂMETROS DE AUDITORIA E FILTRAGEM:', marginX + 3, currentY + 4.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(51, 65, 85);
+  const turmaTexto = turmaSelecionada === 'todas' ? 'Todas as Turmas (Visão Geral)' : `Turma: ${turmaSelecionada}`;
+  doc.text(`• ${turmaTexto}`, marginX + 3, currentY + 8.5);
+  doc.text(`• Período: ${periodoDescricao}`, marginX + 65, currentY + 8.5);
+  doc.text(`• Total de Alunos no Escopo: ${resumoGeral.totalAlunos}`, marginX + 135, currentY + 8.5);
+
+  currentY += 15;
+
+  const cardW = (contentWidth - 6) / 4;
+  const cardH = 14;
+  const kpis = [
+    { label: 'ATIVIDADES NO PERÍODO', val: `${resumoGeral.totalAtividades}`, sub: `${resumoGeral.totalConcluidas} concluídas` },
+    { label: 'TAXA DE CONCLUSÃO', val: `${resumoGeral.taxaMediaConclusao}%`, sub: 'média da turma' },
+    { label: 'ALINHAMENTO AO PEI', val: `${resumoGeral.taxaAlinhamentoPei}%`, sub: 'conformidade SEDUC' },
+    { label: 'ALUNOS COM ATIVIDADES', val: `${alunosMetricas.filter(a => a.totalAtividades > 0).length}/${resumoGeral.totalAlunos}`, sub: 'engajamento ativo' },
+  ];
+  kpis.forEach((kpi, idx) => {
+    const kpiX = marginX + idx * (cardW + 2);
+    doc.setFillColor(241, 245, 249);
+    doc.setDrawColor(203, 213, 225);
+    doc.rect(kpiX, currentY, cardW, cardH, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6.2);
+    doc.setTextColor(100, 116, 139);
+    doc.text(kpi.label, kpiX + 2.5, currentY + 3.8);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(kpi.val, kpiX + 2.5, currentY + 8.8);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(100, 116, 139);
+    doc.text(kpi.sub, kpiX + 2.5, currentY + 12);
+  });
+
+  currentY += cardH + 4;
+
+  checkPageBreak(25);
+  doc.setFillColor(6, 95, 70);
+  doc.rect(marginX, currentY, contentWidth, 6, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(255, 255, 255);
+
+  const colX = {
+    nome: marginX + 3, turma: marginX + 52, laudo: marginX + 74, formato: marginX + 112,
+    ativs: marginX + 132, progresso: marginX + 150, engajamento: marginX + 168,
+  };
+  doc.text('ESTUDANTE', colX.nome, currentY + 4.2);
+  doc.text('TURMA', colX.turma, currentY + 4.2);
+  doc.text('LAUDO / CID', colX.laudo, currentY + 4.2);
+  doc.text('TIPOGRAFIA', colX.formato, currentY + 4.2);
+  doc.text('ATIV.', colX.ativs, currentY + 4.2);
+  doc.text('PROG.', colX.progresso, currentY + 4.2);
+  doc.text('ENGAJAMENTO', colX.engajamento, currentY + 4.2);
+
+  currentY += 6;
+
+  alunosMetricas.forEach((aluno, index) => {
+    checkPageBreak(8);
+    const isEven = index % 2 === 0;
+    doc.setFillColor(isEven ? 255 : 248, isEven ? 255 : 250, isEven ? 255 : 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.15);
+    doc.rect(marginX, currentY, contentWidth, 7, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.2);
+    doc.setTextColor(15, 23, 42);
+    const nomeLimpo = aluno.estudante.nome.length > 28 ? aluno.estudante.nome.slice(0, 26) + '...' : aluno.estudante.nome;
+    doc.text(nomeLimpo, colX.nome, currentY + 4.8);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(51, 65, 85);
+    doc.text(aluno.estudante.turma || aluno.estudante.anoSerie || '-', colX.turma, currentY + 4.8);
+    const laudoCurto = (aluno.estudante.laudo || 'Em avaliação').slice(0, 22);
+    doc.text(laudoCurto, colX.laudo, currentY + 4.8);
+    doc.setFont('helvetica', aluno.formatoLetra === 'bastao' ? 'bold' : 'normal');
+    doc.setTextColor(aluno.formatoLetra === 'bastao' ? 6 : 51, aluno.formatoLetra === 'bastao' ? 95 : 65, aluno.formatoLetra === 'bastao' ? 70 : 85);
+    doc.text(aluno.formatoLetra === 'bastao' ? 'Bastão (Lexend)' : 'Cursiva', colX.formato, currentY + 4.8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(15, 23, 42);
+    doc.text(`${aluno.atividadesConcluidas}/${aluno.totalAtividades}`, colX.ativs, currentY + 4.8);
+    doc.setFont('helvetica', 'bold');
+    if (aluno.taxaConclusao >= 70) doc.setTextColor(16, 120, 60);
+    else if (aluno.taxaConclusao >= 40) doc.setTextColor(180, 100, 10);
+    else doc.setTextColor(140, 30, 30);
+    doc.text(`${aluno.taxaConclusao}%`, colX.progresso, currentY + 4.8);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.8);
+    doc.setTextColor(51, 65, 85);
+    doc.text(aluno.nivelEngajamento, colX.engajamento, currentY + 4.8);
+    currentY += 7;
+  });
+
+  currentY += 4;
+
+  checkPageBreak(38);
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(203, 213, 225);
+  doc.rect(marginX, currentY, contentWidth, 24, 'FD');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(30, 41, 59);
+  doc.text('PARECER PEDAGÓGICO CONSOLIDADO E DIRETRIZES DA EDUCAÇÃO ESPECIAL (SEDUC-GO):', marginX + 3, currentY + 4.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.8);
+  doc.setTextColor(71, 85, 105);
+  doc.text('1. As atividades adaptadas com "Letra Bastão" e tipografia Lexend apresentam maior índice de engajamento e menor dispersão motora.', marginX + 3, currentY + 9);
+  doc.text('2. Recomenda-se a continuidade das mediações conjuntas entre Professor Regente e Profissional de Apoio com base nas matrizes SEDUC-GO 2026.', marginX + 3, currentY + 13);
+  doc.text('3. Relatório homologado para fins de conselho de classe, portfólio da Sala de Recursos Multifuncionais (AEE) e coordenação.', marginX + 3, currentY + 17);
+  doc.text(`Registros do Diário de Apoio consultados: ${registrosApoio.length} registros diários no período analisado.`, marginX + 3, currentY + 21);
+
+  currentY += 28;
+
+  checkPageBreak(30);
+  const signW = (contentWidth - 8) / 3;
+  const signY = currentY + 12;
+  doc.setDrawColor(71, 85, 105);
+  doc.setLineWidth(0.3);
+  doc.line(marginX, signY, marginX + signW, signY);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(15, 23, 42);
+  doc.text(currentUser?.name || 'Professor(a) Regente', marginX + signW / 2, signY + 3.5, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Docente Responsável', marginX + signW / 2, signY + 6.5, { align: 'center' });
+
+  const sign2X = marginX + signW + 4;
+  doc.line(sign2X, signY, sign2X + signW, signY);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(15, 23, 42);
+  doc.text('Profissional de Apoio Escolar', sign2X + signW / 2, signY + 3.5, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Acompanhamento e Mediação Diária', sign2X + signW / 2, signY + 6.5, { align: 'center' });
+
+  const sign3X = sign2X + signW + 4;
+  doc.line(sign3X, signY, sign3X + signW, signY);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(15, 23, 42);
+  doc.text('Coordenação Pedagógica / AEE', sign3X + signW / 2, signY + 3.5, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Homologação SEDUC-GO', sign3X + signW / 2, signY + 6.5, { align: 'center' });
+
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text('AdaptaEdu Escolar • Sistema Oficial de Atividades Pedagógicas Adaptadas • SEDUC-GO 2026', marginX, pageHeight - 6);
+    doc.text(`Página ${p} de ${totalPages}`, pageWidth - marginX, pageHeight - 6, { align: 'right' });
+  }
+
+  const turmaClean = sanitizarNomeArquivo(turmaSelecionada) || 'Geral';
+  const fileName = `Relatorio_Progresso_${turmaClean}_${Date.now()}.pdf`;
+  doc.save(fileName);
+  return { success: true, fileName };
+}
+```
+
+# MISSÃO
+
+Entregue a versão **corrigida, refatorada, tipada em strict e pronta para produção em rede** do arquivo acima, preservando:
+- Todas as assinaturas públicas: `calcularMetricasEstudantes`, `exportarRelatorioProgressoPdf`, `MetricasAlunoDashboard`, `ParametrosExportacaoDashboard`.
+- O layout visual e o texto do PDF (documento oficial SEDUC-GO).
+- Compatibilidade com os tipos de `../types`.
+- Zero dependências novas além de `jspdf`.
+
+---
+
+## ETAPA 1 — CORREÇÃO DE BUGS
+
+1.1. **`sanitizarNomeArquivo` importado mas não usado**: aplique-o em `turmaSelecionada` antes de compor `fileName`. Se ele já cobre caracteres inválidos, adicione pós-processamento extra (strip `/ \ : * ? " < > |`, limite 120 chars, timestamp ISO compacto `YYYYMMDD-HHMMSS`).
+
+1.2. **Lógica morta em `formatoLetra`**: o ternário aninhado sempre retorna `'bastao'` no segundo ramo. Simplifique para a regra determinística:
+```ts
+const formatoLetra: 'bastao' | 'cursiva' =
+  (est as any).formatoLetra === 'cursiva' ? 'cursiva' : 'bastao';
+```
+e extraia para função pura `inferirFormatoLetra(estudante): 'bastao' | 'cursiva'` exportada.
+
+1.3. **Parsing de data frágil** em `calcularMetricasEstudantes`:
+- Valide `d`, `m`, `y` antes de `padStart`. Se inválida, retorne `false` no filtro (registre contagem de descartadas para auditoria se quiser).
+- Aceite também ISO com hora. Torne `dataFim` inclusiva (comparar `<=` ou concatenar `T23:59:59.999Z`).
+- Extraia helper puro `normalizarDataParaIso(input?: string): string | null`.
+
+1.4. **`perfisPedagogicos` nunca usado**: use-o para enriquecer o parecer pedagógico (ex.: linha extra "Perfis pedagógicos mapeados: X alunos nível N1, Y nível N2..."). Se não houver dados, degrade graciosamente sem quebrar layout. Alternativamente documente com `// reservado para uso futuro` e remova do uso — mas prefira USAR.
+
+1.5. **`checkPageBreak` não protege conteúdo maior que uma página**: se `neededHeight > pageHeight - 16 - 12`, o conteúdo estoura. Adicione salvaguarda: função `ensureSpace(needed, drawFn)` que (a) chama `checkPageBreak`, (b) se ainda não cabe, divide por linhas ou reduz fonte progressivamente até caber, mantendo legibilidade mínima (≥ 5pt).
+
+1.6. **Consistência `currentY` vs `renderMiniCabecalho` vs `checkPageBreak`**: garanta ordem determinística — `checkPageBreak` reseta `currentY = 12` **antes** de chamar `renderMiniCabecalho`, e o mini cabeçalho soma `+7` uma única vez. Documente em comentário curto.
+
+1.7. **`doc.save()` / `doc.addImage()` sem try/catch**: envolva, retorne `{ success: false, fileName: '', error: string }`. Estenda o tipo de retorno para `Promise<{ success: boolean; fileName: string; error?: string }>` (retrocompatível).
+
+1.8. **`catch` vazio em `addImage`**: adicione `console.warn` condicional (`import.meta.env.DEV` no Vite ou `process.env.NODE_ENV !== 'production'`) e fallback silencioso em prod.
+
+---
+
+## ETAPA 2 — PRONTO PARA PRODUÇÃO EM REDE
+
+2.1. **Não bloquear a thread principal** em turmas grandes (500+ alunos): renderize linhas em blocos de ~50 com `await new Promise(r => setTimeout(r, 0))` entre blocos. Exponha `onProgress?: (pct: number) => void` opcional em `ParametrosExportacaoDashboard` (retrocompatível) e chame a cada bloco.
+
+2.2. **Nome de arquivo seguro para download em rede**: sanitize + limite de tamanho + timestamp ISO compacto. Garanta ASCII onde possível, preservando acentos com fallback (ex.: `normalize('NFD').replace(/[\u0300-\u036f]/g, '')` opcional).
+
+2.3. **Memória**: use `doc.splitTextToSize` para nomes/laudos longos em vez de `slice` cego. Evite concatenar strings gigantes em loops — reutilize buffers curtos.
+
+2.4. **MIME dinâmico**: detecte `PNG` vs `JPEG` a partir do prefixo do `data:` URI (`data:image/png`, `data:image/jpeg`) em vez de hardcoded `'PNG'`.
+
+2.5. **JSDoc** em `exportarRelatorioProgressoPdf`: documente efeitos colaterais (download no browser via `doc.save`), performance estimada (O(n) alunos, blocos assíncronos), pré-requisitos (jsPDF >= 2.5.x) e comportamento em erro.
+
+2.6. **I18N**: centralize todas as strings PT-BR do PDF em objeto `I18N` no topo do arquivo (facilita futura tradução sem alterar lógica).
+
+2.7. **Guard de ambiente**: detecte `typeof window === 'undefined'` (SSR) e retorne `{ success: false, fileName: '', error: 'Ambiente sem DOM' }` antes de qualquer operação jsPDF.
+
+---
+
+## ETAPA 3 — REFATORAÇÃO DE QUALIDADE
+
+3.1. **`THEME`** no topo: cores RGB, tamanhos de fonte, margens, alturas de linha. Substitua as ~40 constantes mágicas espalhadas.
+
+3.2. **Funções puras exportadas** (testáveis):
+- `inferirFormatoLetra(estudante: Estudante): 'bastao' | 'cursiva'`
+- `calcularNivelEngajamento(logs: RegistroAcompanhamentoApoio[], taxa: number, temAtividades: boolean): string`
+- `normalizarDataParaIso(input?: string): string | null`
+- `calcularMetricasEstudantes` (manter pura, sem side effects).
+
+3.3. **Extração de renderizadores** (recebem `doc`, `currentY` e dados, retornam novo `currentY`):
+- `renderHeaderInstitucional(doc, currentY, ctx)`
+- `renderParametrosAuditoria(doc, currentY, ctx)`
+- `renderKpis(doc, currentY, resumoGeral, alunosMetricas)`
+- `renderTabelaAlunos(doc, currentY, alunosMetricas, ctxAsync?)`
+- `renderParecerPedagogico(doc, currentY, ctx)`
+- `renderAssinaturas(doc, currentY, currentUser)`
+- `renderRodapes(doc, pageWidth, pageHeight, marginX)`
+
+3.4. **Tipo auxiliar** `AtividadeAdaptadaComFlag = AtividadeAdaptada & { concluida?: boolean }` para eliminar `(a as any).concluida`. Crie helper `estaConcluida(a): boolean`.
+
+3.5. Comentário curto no topo do arquivo explicando o pipeline: métricas → render → save, e o contrato de retorno.
+
+---
+
+## ETAPA 4 — TypeScript STRICT
+
+Assuma `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`. Corrija:
+- `(a as any).concluida` → tipo auxiliar + `'concluida' in a`.
+- `(est as any).formatoLetra` → helper `obterFormatoLetraDeclarado(est)` com narrowing.
+- `ativsDoAluno[ativsDoAluno.length - 1].dataCriacao` — indexação segura com `?.` e fallback.
+- `aluno.estudante.turma || aluno.estudante.anoSerie || '-'` — alinhe com os campos reais de `Estudante`.
+- `(laudo ?? 'Em avaliação').slice(0, 22)` — nunca `slice` em `undefined`.
+- Nenhum `any` não justificado; se inevitável, isole em 1 linha com `// eslint-disable-next-line @typescript-eslint/no-explicit-any` e comentário de motivo.
+
+---
+
+## ETAPA 5 — TESTES SUGERIDOS (apenas descreva, não implemente)
+
+Para `calcularMetricasEstudantes` (5 casos):
+1. Sem atividades → taxa 0, nível "Sem Atividades".
+2. Turma "todas" → soma de todas as turmas; `turmasPresentes` único e ordenado.
+3. Filtro de data inclusivo nas bordas (`dataInicio === dataFim === dataAtividade` → inclui).
+4. Data malformada ("32/13/2026") → não quebra, atividade excluída do filtro.
+5. Mistura de `status === 'Revisada'` e `concluida === true` → contagem combinada correta.
+
+Para `inferirFormatoLetra` / `calcularNivelEngajamento` (3 casos):
+1. `formatoLetra` explícito "cursiva" prevalece.
+2. Sem `formatoLetra` + laudo "TEA" → "bastao" (regra determinística).
+3. Logs com 100% dificuldade → "Apoio Constante"; 0% dificuldade + logs → "Autônomo c/ Apoio".
+
+---
+
+## ETAPA 6 — DEPLOY EM REDE (descreva, não implemente)
+
+- **Vite**: `base: './'` ou `'/'` conforme hospedagem; `server.host: '0.0.0.0'` para LAN; `preview.host: '0.0.0.0'`.
+- **CRA**: `HOST=0.0.0.0 npm start`; `homepage` no `package.json` se subpath.
+- **Cache-busting**: hash em nomes de assets (padrão Vite/CRA).
+- **CSP sugerida** (meta tag): `default-src 'self'; img-src 'self' data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:;` — jsPDF usa `blob:` e `data:` para imagens e workers.
+- **CORS**: se houver backend, permitir origem da LAN (`http://192.168.x.x:*` em dev) e usar HTTPS em produção.
+- **Teste de carga**: exportar PDF para 500 alunos simulados; medir TTI e memória no Chrome DevTools.
+
+---
+
+## ETAPA 7 — RISCOS RESIDUAIS (descreva, não implemente)
+
+Liste 5 riscos remanescentes (ex.: renderização jsPDF travando em iOS Safari com imagens grandes, bloqueio de download em iframe, limite de memória em turmas 5k+, etc.) com mitigação sugerida.
+
+---
+
+# FORMATO DE SAÍDA (OBRIGATÓRIO)
+
+Responda em **português**, nesta ordem, com títulos claros:
+
+1. **`## Código final`** — bloco único ```typescript``` com o arquivo `dashboardPdfService.ts` completo, pronto para colar.
+2. **`## Changelog`** — bullets curtos `[BUG|PROD|REFAC|TS] descrição → motivo`.
+3. **`## Testes sugeridos`** — apenas a descrição (Etapa 5).
+4. **`## Notas de deploy em rede`** — Vite/CRA/CSP/CORS/carga (Etapa 6).
+5. **`## Riscos residuais e mitigações`** — Etapa 7.
+
+# RESTRIÇÕES FINAIS
+
+- NÃO renomeie exports públicos.
+- NÃO adicione dependências além de `jspdf`.
+- NÃO altere o layout/texto do PDF (documento oficial).
+- NÃO quebre compatibilidade com `../types` — se um campo não existir, isole o acesso com narrowing e fallback.
+- Comente apenas o necessário; evite comentários óbvios.
+- Se algo for ambíguo (ex.: campos reais de `Estudante`), assuma o tipo mais próximo e sinalize com `// TODO: confirmar tipo em ../types` — nunca invente campos.
+
+===FIM===

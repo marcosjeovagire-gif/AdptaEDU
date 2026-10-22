@@ -827,3 +827,13 @@ export async function obterEstatisticasArmazenamento(): Promise<{
     indexedDbSupported: supported,
   };
 }
+
+/**
+ * Zera estritamente os lançamentos diários do apoio e as atividades geradas no IndexedDB,
+ * preservando integralmente estudantes, professores, matrizes, habilidades e configurações.
+ */
+export async function zerarLancamentosEAtividadesIdb(): Promise<void> {
+  await idbClear(STORES.ATIVIDADES);
+  await idbClear(STORES.REGISTROS_APOIO);
+}
+

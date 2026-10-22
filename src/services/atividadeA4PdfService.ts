@@ -1,7 +1,41 @@
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
+import QRCode from 'qrcode';
 import { AtividadeAdaptada, EscolaConfig } from '../types';
 import { getLogoEscolaBase64 } from '../assets/branding/logoEscolaBase64';
+
+/**
+ * Desenha um QR Code vetorial nítido diretamente no documento jsPDF
+ */
+export function desenharQrCodeVetorialNoDoc(
+  doc: jsPDF,
+  texto: string,
+  x: number,
+  y: number,
+  tamanhoMm: number
+) {
+  try {
+    const qr = QRCode.create(texto, { errorCorrectionLevel: 'M' });
+    const numCells = qr.modules.size;
+    const cellSize = tamanhoMm / numCells;
+
+    // Fundo branco
+    doc.setFillColor(255, 255, 255);
+    doc.rect(x, y, tamanhoMm, tamanhoMm, 'F');
+
+    // Módulos escuros
+    doc.setFillColor(15, 23, 42);
+    for (let r = 0; r < numCells; r++) {
+      for (let c = 0; c < numCells; c++) {
+        if (qr.modules.get(r, c)) {
+          doc.rect(x + c * cellSize, y + r * cellSize, cellSize, cellSize, 'F');
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[PDF Engine] Erro ao desenhar QR Code vetorial no jsPDF:', err);
+  }
+}
 
 /**
  * Sanitiza strings para formação de nomes de arquivo seguros
@@ -39,9 +73,11 @@ export function renderizarAtividadeNoDoc(
 ): number {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const marginX = 15;
-  const contentWidth = pageWidth - marginX * 2;
-  let currentY = 14;
+  const marginX = 10; // Margem estrita de 10mm (SEDUC-GO / A4SheetPreview)
+  const marginTop = 10; // Margem superior estrita de 10mm
+  const marginBottom = 10; // Margem inferior estrita de 10mm
+  const contentWidth = pageWidth - marginX * 2; // 190mm de largura útil
+  let currentY = marginTop;
 
   const renderMiniCabecalho = () => {
     doc.setFont('helvetica', 'bold');
@@ -50,18 +86,18 @@ export function renderizarAtividadeNoDoc(
     doc.text(
       `${escolaConfig?.nome || 'Colégio Estadual Olynto Pereira de Castro'} • Atividade Adaptada (${atividade.turma} - ${atividade.disciplina})`,
       marginX,
-      currentY
+      currentY + 3.5
     );
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.2);
-    doc.line(marginX, currentY + 2, pageWidth - marginX, currentY + 2);
-    currentY += 7;
+    doc.line(marginX, currentY + 5.5, pageWidth - marginX, currentY + 5.5);
+    currentY += 9;
   };
 
   const checkPageBreak = (neededHeight: number) => {
-    if (currentY + neededHeight > pageHeight - 14) {
+    if (currentY + neededHeight > pageHeight - marginBottom - 4) {
       doc.addPage();
-      currentY = 14;
+      currentY = marginTop;
       renderMiniCabecalho();
     }
   };
@@ -113,7 +149,7 @@ export function renderizarAtividadeNoDoc(
   );
 
   // Caixa de Visto/Nota no canto direito
-  const vistoWidth = 20;
+  const vistoWidth = 16;
   const vistoX = pageWidth - marginX - vistoWidth - 2;
   doc.setDrawColor(148, 163, 184);
   doc.setLineWidth(0.2);
@@ -125,6 +161,21 @@ export function renderizarAtividadeNoDoc(
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(148, 163, 184);
   doc.text('______', vistoX + vistoWidth / 2, currentY + 9.5, { align: 'center' });
+
+  // QR Code de Acesso Rápido à Versão Digital (Vinculado ao ID da Atividade)
+  const qrSize = 9.5;
+  const qrX = vistoX - qrSize - 3;
+  const urlDigital = `https://adaptaedu.seduc.go.gov.br?view=atividade&id=${encodeURIComponent(atividade.id)}`;
+  
+  doc.setDrawColor(148, 163, 184);
+  doc.setLineWidth(0.2);
+  doc.rect(qrX - 0.5, currentY + 1, qrSize + 1, qrSize + 2.5);
+  desenharQrCodeVetorialNoDoc(doc, urlDigital, qrX, currentY + 1.3, qrSize);
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(4.2);
+  doc.setTextColor(71, 85, 105);
+  doc.text('QR DIGITAL', qrX + qrSize / 2, currentY + qrSize + 3.1, { align: 'center' });
 
   // Divisória interna sutil
   doc.setDrawColor(203, 213, 225);
@@ -241,6 +292,7 @@ export function renderizarAtividadeNoDoc(
   }
 
   const ehBastao = 
+    atividade.formatoLetra === 'bastao' ||
     atividade.usarCaixaAlta ||
     atividade.estiloTipograficoVisual === 'letra_bastao' ||
     atividade.estiloTipograficoVisual === 'letra_bastao_desenho_matriz' ||
@@ -346,7 +398,7 @@ export function gerarAtividadePdfProgramatico(
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const marginX = 15;
+  const marginX = 10; // Margens estritas de 10mm (190mm de largura útil)
 
   renderizarAtividadeNoDoc(doc, atividade, escolaConfig, true);
 
@@ -360,9 +412,9 @@ export function gerarAtividadePdfProgramatico(
     doc.text(
       escolaConfig?.textoRodape || 'Documento escolar gerado para avaliação pedagógica individualizada adaptada.',
       marginX,
-      pageHeight - 8
+      pageHeight - 6
     );
-    doc.text(`Página ${i} de ${totalPages}`, pageWidth - marginX, pageHeight - 8, { align: 'right' });
+    doc.text(`Página ${i} de ${totalPages}`, pageWidth - marginX, pageHeight - 6, { align: 'right' });
   }
 
   return doc;
@@ -370,7 +422,7 @@ export function gerarAtividadePdfProgramatico(
 
 /**
  * Gera um documento PDF contínuo contendo múltiplas atividades adaptadas,
- * otimizado para impressão em lote na folha A4 com logo institucional padronizado.
+ * otimizado para impressão em lote na folha A4 com logo institucional padronizado e margens de 10mm.
  */
 export function gerarMultiplasAtividadesPdfProgramatico(
   atividades: AtividadeAdaptada[],
@@ -384,7 +436,7 @@ export function gerarMultiplasAtividadesPdfProgramatico(
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const marginX = 15;
+  const marginX = 10; // Margens estritas de 10mm
 
   atividades.forEach((ativ, idx) => {
     if (idx > 0) {
@@ -403,9 +455,9 @@ export function gerarMultiplasAtividadesPdfProgramatico(
     doc.text(
       escolaConfig?.textoRodape || 'Documento escolar gerado para avaliação pedagógica individualizada adaptada.',
       marginX,
-      pageHeight - 8
+      pageHeight - 6
     );
-    doc.text(`Página ${i} de ${totalPages}`, pageWidth - marginX, pageHeight - 8, { align: 'right' });
+    doc.text(`Página ${i} de ${totalPages}`, pageWidth - marginX, pageHeight - 6, { align: 'right' });
   }
 
   return doc;
@@ -413,10 +465,11 @@ export function gerarMultiplasAtividadesPdfProgramatico(
 
 /**
  * Exporta a folha A4 da Atividade Adaptada para PDF.
- * Utiliza preferencialmente html2canvas para capturar a folha visual fielmente renderizada no DOM,
- * fatiando páginas A4 com resolução de impressão de 2x (Hi-DPI).
- * Caso ocorra qualquer falha na renderização de canvas (ex: CORS ou ambiente headless),
- * aciona automaticamente o gerador nativo jsPDF vetorial.
+ * Garante:
+ * 1) Pré-carregamento fiel das fontes acessíveis 'Lexend' e 'Comic Neue' para dislexia;
+ * 2) Margens estritas de 10mm no documento A4;
+ * 3) Fatiamento inteligente de páginas evitando qualquer corte em tabelas, linhas ou caixas de questões;
+ * 4) Fallback vetorial jsPDF imediato se html2canvas não estiver disponível.
  */
 export async function exportarAtividadeParaPdf(
   atividade: AtividadeAdaptada,
@@ -428,7 +481,23 @@ export async function exportarAtividadeParaPdf(
 
   if (element && typeof window !== 'undefined') {
     try {
-      // 1. Renderiza a folha A4 com html2canvas em alta densidade (escala 2)
+      // 1. Pré-carregamento e prontidão das fontes para alunos com dislexia
+      if ('fonts' in document) {
+        try {
+          await document.fonts.ready;
+          await Promise.allSettled([
+            document.fonts.load('400 14px Lexend'),
+            document.fonts.load('600 14px Lexend'),
+            document.fonts.load('700 14px Lexend'),
+            document.fonts.load('400 14px "Comic Neue"'),
+            document.fonts.load('700 14px "Comic Neue"'),
+          ]);
+        } catch (fontErr) {
+          console.warn('[PDF Engine] Aviso ao pré-carregar fontes acessíveis:', fontErr);
+        }
+      }
+
+      // 2. Renderiza a folha A4 com html2canvas em alta densidade (escala 2x / 300 DPI)
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
@@ -450,15 +519,56 @@ export async function exportarAtividadeParaPdf(
 
       // Altura correspondente a uma página A4 na escala do canvas em pixels
       const pageHeightPx = (canvasWidth * pageHeightMm) / pageWidthMm;
-      let renderedHeightPx = 0;
+
+      // 3. Detecção de blocos indivisíveis para evitar cortes em tabelas e questões
+      const elementRect = element.getBoundingClientRect();
+      const avoidElements = Array.from(
+        element.querySelectorAll(
+          'table, tr, tbody, thead, .questao-container, .bloco-questao, .tabela-adaptada, .break-inside-avoid, .cabecalho-a4, .assinatura-box, .pauta-caligrafica'
+        )
+      );
+
+      const scaleRatio = canvasWidth / (element.offsetWidth || 1);
+      const safeBlocks = avoidElements
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          return {
+            top: (r.top - elementRect.top) * scaleRatio,
+            bottom: (r.bottom - elementRect.top) * scaleRatio,
+            height: r.height * scaleRatio,
+          };
+        })
+        .filter((b) => b.height > 8 && b.height < pageHeightPx);
+
+      let currentSliceTop = 0;
       let pageIndex = 0;
 
-      while (renderedHeightPx < canvasHeight) {
+      while (currentSliceTop < canvasHeight) {
         if (pageIndex > 0) {
           doc.addPage();
         }
 
-        const sliceHeightPx = Math.min(pageHeightPx, canvasHeight - renderedHeightPx);
+        let idealSliceBottom = currentSliceTop + pageHeightPx;
+
+        // Se a fatia ultrapassar o final do canvas, ajusta para o fim
+        if (idealSliceBottom >= canvasHeight) {
+          idealSliceBottom = canvasHeight;
+        } else {
+          // Verifica se o ponto de corte intercepta o meio de uma tabela ou questão
+          const intersectingBlock = safeBlocks.find(
+            (b) =>
+              b.top < idealSliceBottom &&
+              b.bottom > idealSliceBottom &&
+              b.top > currentSliceTop + 60
+          );
+
+          if (intersectingBlock) {
+            // Ajusta o corte para logo acima da tabela ou questão, mantendo respiro de 4px para preservar bordas
+            idealSliceBottom = Math.max(currentSliceTop + 60, intersectingBlock.top - 4);
+          }
+        }
+
+        const sliceHeightPx = Math.max(1, idealSliceBottom - currentSliceTop);
         const sliceCanvas = document.createElement('canvas');
         sliceCanvas.width = canvasWidth;
         sliceCanvas.height = sliceHeightPx;
@@ -470,7 +580,7 @@ export async function exportarAtividadeParaPdf(
           sliceCtx.drawImage(
             canvas,
             0,
-            renderedHeightPx,
+            currentSliceTop,
             canvasWidth,
             sliceHeightPx,
             0,
@@ -484,7 +594,7 @@ export async function exportarAtividadeParaPdf(
           doc.addImage(imgData, 'JPEG', 0, 0, pageWidthMm, sliceHeightMm, undefined, 'FAST');
         }
 
-        renderedHeightPx += pageHeightPx;
+        currentSliceTop = idealSliceBottom;
         pageIndex++;
       }
 
@@ -495,7 +605,7 @@ export async function exportarAtividadeParaPdf(
     }
   }
 
-  // 2. Fallback de alta precisão via jsPDF nativo
+  // 4. Fallback de alta precisão via jsPDF nativo com margens estritas de 10mm
   const docFallback = gerarAtividadePdfProgramatico(atividade, escolaConfig);
   const blobFallback = docFallback.output('blob');
   return { doc: docFallback, fileName, blob: blobFallback };
