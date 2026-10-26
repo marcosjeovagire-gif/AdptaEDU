@@ -311,7 +311,7 @@ export function renderizarAtividadeNoDoc(
 
   // 4. Questões Adaptadas
   atividade.questoes.forEach((q, idx) => {
-    checkPageBreak(25);
+    checkPageBreak(35);
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
@@ -319,47 +319,55 @@ export function renderizarAtividadeNoDoc(
     const numTexto = `Questão ${q.numero || idx + 1}: `;
     doc.text(numTexto, marginX, currentY);
 
+    // Renderiza Enunciado (Considera Bastão se configurado)
     doc.setFont('helvetica', 'normal');
     const numWidth = doc.getTextWidth(numTexto);
-    const enunciadoOriginal = q.enunciado || '';
-    const enunciadoTexto = ehBastao ? enunciadoOriginal.toUpperCase() : enunciadoOriginal;
+    const enunciadoTexto = ehBastao ? (q.enunciado || '').toUpperCase() : (q.enunciado || '');
     const enunciadoLinhas = doc.splitTextToSize(enunciadoTexto, contentWidth - numWidth);
     doc.text(enunciadoLinhas, marginX + numWidth, currentY);
-    currentY += enunciadoLinhas.length * 4.2 + 2;
+    currentY += enunciadoLinhas.length * 4.5 + 2;
+
+    // Renderiza Imagem se existir (Requisito 5)
+    if ((q as any).ilustracaoSvgOuUrl || (q as any).base64Imagem) {
+      checkPageBreak(45);
+      try {
+        const imgData = (q as any).base64Imagem || (q as any).ilustracaoSvgOuUrl;
+        if (imgData && imgData.startsWith('data:image')) {
+          doc.addImage(imgData, 'PNG', marginX + 20, currentY, 50, 40);
+          currentY += 45;
+        }
+      } catch (e) {
+        console.warn('Erro ao renderizar imagem na questão:', e);
+      }
+    }
 
     // Alternativas
     if (q.alternativas && q.alternativas.length > 0) {
       q.alternativas.forEach((alt) => {
-        checkPageBreak(7);
+        checkPageBreak(8);
         doc.setDrawColor(71, 85, 105);
-        doc.setLineWidth(0.2);
-        doc.rect(marginX + 4, currentY - 2.5, 3.2, 3.2);
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(30, 41, 59);
+        doc.rect(marginX + 4, currentY - 2.8, 3.5, 3.5);
         const altTexto = ehBastao ? alt.toUpperCase() : alt;
-        const altLinhas = doc.splitTextToSize(altTexto, contentWidth - 14);
+        const altLinhas = doc.splitTextToSize(altTexto, contentWidth - 15);
         doc.text(altLinhas, marginX + 10, currentY);
-        currentY += altLinhas.length * 3.8 + 1.8;
+        currentY += altLinhas.length * 4 + 2;
       });
-      currentY += 1.5;
     }
 
-    // Linhas pautadas para resposta discursiva
-    if (q.linhasResposta && q.linhasResposta > 0) {
-      for (let l = 0; l < q.linhasResposta; l++) {
-        checkPageBreak(6);
-        currentY += 5;
-        doc.setDrawColor(203, 213, 225);
-        doc.setLineWidth(0.2);
-        doc.line(marginX + 4, currentY, pageWidth - marginX - 4, currentY);
-      }
-      currentY += 2.5;
-    }
-
-    currentY += 3.5;
+    currentY += 4;
   });
+
+  // Renderiza Imagens Pedagógicas Adicionais da AI (Requisito 2)
+  if ((atividade as any).imagensPedagogicas?.length > 0) {
+    (atividade as any).imagensPedagogicas.forEach((img: any) => {
+      checkPageBreak(60);
+      if (img.base64 && img.base64.startsWith('data:image')) {
+        doc.addImage(img.base64, 'PNG', marginX, currentY, 190, 50);
+        currentY += 55;
+      }
+    });
+  }
+
 
   // 5. Campo de Assinatura do Professor
   checkPageBreak(22);

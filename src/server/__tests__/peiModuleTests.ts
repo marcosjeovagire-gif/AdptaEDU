@@ -1,9 +1,15 @@
 /**
- * Bateria de Testes para o Novo Módulo: Criar PEI (SEDUC-GO / SIAP)
- * Colégio Estadual Olynto Pereira de Castro (CRE Rio Verde - GO)
- * Validação de vinculação de dados reais, diretrizes do SIAP, sugestão com IA,
- * persistência em documentos e diagramação oficial A4 em PDF com logo pequeno e proporcional.
+ * Mock simples de localStorage para ambiente de testes Node.js
  */
+if (typeof global.localStorage === 'undefined') {
+  const store: Record<string, string> = {};
+  (global as any).localStorage = {
+    getItem: (key: string) => store[key] || null,
+    setItem: (key: string, value: string) => { store[key] = value; },
+    removeItem: (key: string) => { delete store[key]; },
+    clear: () => { for (const key in store) delete store[key]; }
+  };
+}
 
 import { PeiDocumento, Estudante, EscolaConfig } from '../../types';
 import { 
@@ -182,17 +188,17 @@ async function main() {
       });
 
       const temEtapa1 = Boolean(
-        res.etapa1.habilidadesCognitivas.length > 20 &&
-        res.etapa1.habilidadesAdaptativas.length > 20 &&
-        res.etapa1.dificuldadesCognitivas.length > 20 &&
-        res.etapa1.dificuldadesAdaptativas.length > 20
+        res.etapa1!.habilidadesCognitivas.length > 20 &&
+        res.etapa1!.habilidadesAdaptativas.length > 20 &&
+        res.etapa1!.dificuldadesCognitivas.length > 20 &&
+        res.etapa1!.dificuldadesAdaptativas.length > 20
       );
 
       const temEtapa2 = Boolean(
-        res.etapa2.expectativas.length > 20 &&
-        res.etapa2.conteudos.length > 20 &&
-        res.etapa2.metodologias.length > 20 &&
-        res.etapa2.avaliacao.length > 20
+        res.etapa2!.expectativas.length > 20 &&
+        res.etapa2!.conteudos.length > 20 &&
+        res.etapa2!.metodologias.length > 20 &&
+        res.etapa2!.avaliacao.length > 20
       );
 
       return temEtapa1 && temEtapa2;
@@ -548,7 +554,7 @@ async function main() {
       const diagNecVazias = validarCoerenciaSemanticaPei(necVazias, areaValida);
       const acusaNecVazia = diagNecVazias.necessidadesCriticasVazias === true &&
         diagNecVazias.temInconsistenciaCritica === true &&
-        diagNecVazias.inconsistencias.some((i) => i.categoria === 'necessidades');
+        diagNecVazias.inconsistencias.some((i: any) => i.categoria === 'necessidades');
 
       // Caso 2: Estratégias vazias na Área Acadêmica -> Deve acusar inconsistência crítica
       const necPreenchida = {
@@ -597,7 +603,7 @@ async function main() {
         },
       ];
       const diagDesalinhado = validarCoerenciaSemanticaPei(necPreenchida, areaSemAtencao);
-      const detectaDesalinhamento = diagDesalinhado.inconsistencias.some((i) => i.campo.includes('Atenção'));
+      const detectaDesalinhamento = diagDesalinhado.inconsistencias.some((i: any) => i.campo.includes('Atenção'));
 
       // Caso 4: 100% Coerente e Preenchido com metodologias ricas
       const areaCoerente = [
@@ -656,7 +662,7 @@ async function main() {
       const bloqueiaAmbasVazias = resAmbasVazias.valido === false &&
         resAmbasVazias.necessidadesPreenchidas === false &&
         resAmbasVazias.estrategiasPreenchidas === false &&
-        resAmbasVazias.detalhesPendencias.length >= 2;
+        (resAmbasVazias.detalhesPendencias || '').length >= 2;
 
       // 2. Necessidades preenchidas mas Estratégias vazias
       const necPreenchidas = {
@@ -690,7 +696,7 @@ async function main() {
       const bloqueiaEstrategiasVazias = resEstrategiasVazias.valido === false &&
         resEstrategiasVazias.necessidadesPreenchidas === true &&
         resEstrategiasVazias.estrategiasPreenchidas === false &&
-        resEstrategiasVazias.mensagemAlertaRodape.includes('Campos Críticos Pendentes');
+        (resEstrategiasVazias.mensagemAlertaRodape || '').includes('Campos Críticos Pendentes');
 
       // 3. Ambas preenchidas conforme Anexo 9
       const areaValida = [
@@ -709,7 +715,7 @@ async function main() {
       const liberaGeracaoPdf = resValido.valido === true &&
         resValido.necessidadesPreenchidas === true &&
         resValido.estrategiasPreenchidas === true &&
-        resValido.detalhesPendencias.length === 0;
+        (resValido.detalhesPendencias || '').length === 0;
 
       return bloqueiaAmbasVazias && bloqueiaEstrategiasVazias && liberaGeracaoPdf;
     },

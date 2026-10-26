@@ -1,170 +1,123 @@
 {
   "entities": {
     "AuthorizedUser": {
-      "title": "AuthorizedUser",
-      "description": "Usuário autorizado no sistema escolar com perfis e permissões RBAC",
+      "title": "Authorized User",
+      "description": "User authorized to access specific roles in the school system.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "uid": { "type": "string", "maxLength": 128 },
-        "nome": { "type": "string", "maxLength": 200 },
-        "email": { "type": "string", "format": "email", "maxLength": 200 },
-        "emailNormalized": { "type": "string", "maxLength": 200 },
-        "roles": { "type": "array" },
-        "schoolId": { "type": "string", "maxLength": 128 },
-        "status": { "type": "string", "enum": ["authorized", "pending", "revoked", "ativo"] },
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "emailNormalized": { "type": "string" },
+        "roles": { "type": "array", "items": { "type": "string" } },
         "active": { "type": "boolean" },
-        "createdAt": { "type": "string" },
-        "updatedAt": { "type": "string" }
+        "status": { "type": "string", "enum": ["authorized", "inactive", "archived"] },
+        "schoolId": { "type": "string" },
+        "allowedClasses": { "type": "array", "items": { "type": "string" } },
+        "allowedDisciplines": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["emailNormalized", "roles", "schoolId"]
+      "required": ["id", "email", "roles"]
     },
     "Estudante": {
       "title": "Estudante",
-      "description": "Estudante público-alvo da educação especial com dados inclusivos e laudos",
+      "description": "Student record with pedagogical and inclusion details.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "nome": { "type": "string", "maxLength": 200 },
-        "turma": { "type": "string", "maxLength": 50 },
-        "turno": { "type": "string", "maxLength": 50 },
-        "matricula": { "type": "string", "maxLength": 50 },
-        "diagnostico": { "type": "string", "maxLength": 500 },
-        "cid": { "type": "string", "maxLength": 50 },
-        "profissionalApoioNome": { "type": "string", "maxLength": 200 },
-        "professoresAutorizadosIds": { "type": "array" },
-        "schoolId": { "type": "string", "maxLength": 128 }
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "matricula": { "type": "string" },
+        "turma": { "type": "string" },
+        "anoSerie": { "type": "string" },
+        "turno": { "type": "string" },
+        "situacao": { "type": "string", "enum": ["ativo", "arquivado", "transferido"] },
+        "laudo": { "type": "string" },
+        "schoolId": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "nome", "turma"]
-    },
-    "AtividadeAdaptada": {
-      "title": "AtividadeAdaptada",
-      "description": "Atividade pedagógica adaptada com base na BNCC/DC-GO e perfil do aluno",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "titulo": { "type": "string", "maxLength": 300 },
-        "disciplina": { "type": "string", "maxLength": 100 },
-        "turma": { "type": "string", "maxLength": 50 },
-        "estudanteId": { "type": "string", "maxLength": 128 },
-        "estudanteNome": { "type": "string", "maxLength": 200 },
-        "professorId": { "type": "string", "maxLength": 128 },
-        "professorNome": { "type": "string", "maxLength": 200 },
-        "status": { "type": "string", "maxLength": 50 },
-        "criadaEm": { "type": "string" },
-        "schoolId": { "type": "string", "maxLength": 128 }
-      },
-      "required": ["id", "titulo", "disciplina"]
-    },
-    "RegistroAcompanhamentoApoio": {
-      "title": "RegistroAcompanhamentoApoio",
-      "description": "Registro diário de atendimento e mediação pedagógica do profissional de apoio",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "estudanteId": { "type": "string", "maxLength": 128 },
-        "estudanteNome": { "type": "string", "maxLength": 200 },
-        "dataRegistro": { "type": "string", "maxLength": 30 },
-        "dataIso": { "type": "string", "maxLength": 30 },
-        "profissionalResponsavelNome": { "type": "string", "maxLength": 200 },
-        "resumoRotina": { "type": "string", "maxLength": 5000 },
-        "schoolId": { "type": "string", "maxLength": 128 }
-      },
-      "required": ["id", "estudanteId", "dataRegistro"]
+      "required": ["id", "nome", "turma", "schoolId"]
     },
     "PeiDocumento": {
-      "title": "PeiDocumento",
-      "description": "Plano Educacional Individualizado oficial em conformidade com o SIAP/SEDUC-GO",
+      "title": "PEI Document",
+      "description": "Individualized Education Plan (Plano de Ensino Individualizado).",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "estudanteId": { "type": "string", "maxLength": 128 },
-        "estudanteNome": { "type": "string", "maxLength": 200 },
-        "bimestre": { "type": "string", "maxLength": 50 },
-        "anoLetivo": { "type": "string", "maxLength": 10 },
-        "status": { "type": "string", "maxLength": 50 },
-        "schoolId": { "type": "string", "maxLength": 128 }
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "diagnosis": { "type": "string" },
+        "status": { "type": "string", "enum": ["rascunho", "homologado", "em_revisao"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "studentId"]
+    },
+    "AtividadeAdaptada": {
+      "title": "Atividade Adaptada",
+      "description": "Adapted pedagogical activity generated for a student.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "estudanteId": { "type": "string" },
+        "estudanteNome": { "type": "string" },
+        "turma": { "type": "string" },
+        "disciplina": { "type": "string" },
+        "conteudo": { "type": "string" },
+        "status": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "estudanteId"]
     },
-    "EscolaConfig": {
-      "title": "EscolaConfig",
-      "description": "Configurações institucionais da unidade escolar, matrizes e backups",
+    "RegistroAcompanhamentoApoio": {
+      "title": "Registro de Apoio",
+      "description": "Daily support log for a student.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "nome": { "type": "string", "maxLength": 300 },
-        "municipio": { "type": "string", "maxLength": 100 },
-        "backupHorario": { "type": "string", "maxLength": 20 }
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "nomeEstudante": { "type": "string" },
+        "data": { "type": "string", "format": "date" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id"]
+      "required": ["id", "studentId", "data"]
     },
-    "AuditLog": {
-      "title": "AuditLog",
-      "description": "Trilha imutável de auditoria institucional e segurança",
+    "EscolaConfig": {
+      "title": "Escola Config",
+      "description": "Configuration and branding for the school.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "maxLength": 128 },
-        "timestamp": { "type": "string", "maxLength": 50 },
-        "acao": { "type": "string", "maxLength": 100 },
-        "modulo": { "type": "string", "maxLength": 100 },
-        "usuarioResponsavelEmail": { "type": "string", "maxLength": 200 }
-      },
-      "required": ["id", "acao", "timestamp"]
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "municipio": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "firestore": {
     "/authorizedUsers/{userId}": {
       "schema": "AuthorizedUser",
-      "description": "Perfis de usuários autorizados e permissões no sistema"
+      "description": "Authorized system users."
     },
     "/students/{studentId}": {
       "schema": "Estudante",
-      "description": "Registros de estudantes cadastrados e dados inclusivos"
-    },
-    "/pedagogicalProfiles/{profileId}": {
-      "schema": "Estudante",
-      "description": "Perfis pedagógicos e adaptações específicas"
-    },
-    "/skills/{skillId}": {
-      "schema": "EscolaConfig",
-      "description": "Habilidades curriculares homologadas"
-    },
-    "/curriculumMatrices/{matrixId}": {
-      "schema": "EscolaConfig",
-      "description": "Matrizes curriculares por ano e disciplina"
-    },
-    "/activities/{activityId}": {
-      "schema": "AtividadeAdaptada",
-      "description": "Atividades pedagógicas adaptadas para estudantes"
-    },
-    "/supportRecords/{recordId}": {
-      "schema": "RegistroAcompanhamentoApoio",
-      "description": "Registros diários do profissional de apoio escolar"
-    },
-    "/supportLogs/{logId}": {
-      "schema": "RegistroAcompanhamentoApoio",
-      "description": "Logs de acompanhamento e suporte pedagógico"
+      "description": "Student records."
     },
     "/peis/{peiId}": {
       "schema": "PeiDocumento",
-      "description": "Documentos e formulários oficiais de PEI"
+      "description": "PEI documents."
     },
-    "/bimonthlyReports/{reportId}": {
-      "schema": "PeiDocumento",
-      "description": "Relatórios bimestrais de desenvolvimento"
+    "/activities/{activityId}": {
+      "schema": "AtividadeAdaptada",
+      "description": "Generated activities."
     },
-    "/auditLogs/{logId}": {
-      "schema": "AuditLog",
-      "description": "Logs de auditoria e segurança escolar"
+    "/supportRecords/{recordId}": {
+      "schema": "RegistroAcompanhamentoApoio",
+      "description": "Support logs."
     },
     "/schools/{schoolId}": {
       "schema": "EscolaConfig",
-      "description": "Configurações institucionais e metadados da escola"
-    },
-    "/syncMeta/{metaId}": {
-      "schema": "EscolaConfig",
-      "description": "Metadados de controle de sincronização"
+      "description": "School settings."
     }
   }
 }

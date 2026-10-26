@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { AtividadeAdaptada, EscolaConfig, QuestaoAdaptada } from '../../types';
+import { AtividadeAdaptadaFull, ImagemPedagogica } from '../../types/pedagogico';
 import { InstitutionalLogo } from '../common/InstitutionalLogo';
 import { LogoOlynto } from '../common/LogoOlynto';
 import { baixarAtividadeComoPdf } from '../../services/atividadeA4PdfService';
@@ -28,7 +29,7 @@ import { sincronizarPendenciasFila, getIsOnline } from '../../services/offlineSy
 import { adicionarListenerConectividade } from '../../services/connectivityService';
 
 interface A4SheetPreviewProps {
-  atividade: AtividadeAdaptada;
+  atividade: AtividadeAdaptada | AtividadeAdaptadaFull;
   escolaConfig: EscolaConfig;
   onEditQuestao?: (questao: QuestaoAdaptada) => void;
   onSaveAtividade?: (atividade: AtividadeAdaptada) => void;
@@ -143,7 +144,7 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
   onEditQuestao,
   onSaveAtividade,
 }) => {
-  const [atividadeAtual, setAtividadeAtual] = useState<AtividadeAdaptada>(atividade);
+  const [atividadeAtual, setAtividadeAtual] = useState<AtividadeAdaptada | AtividadeAdaptadaFull>(atividade);
   const [copiado, setCopiado] = useState(false);
   const [editandoQuestaoId, setEditandoQuestaoId] = useState<string | null>(null);
   const [enunciadoEditado, setEnunciadoEditado] = useState<string>('');
@@ -640,11 +641,48 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
             <p className="text-slate-600 mt-1 italic">
               {atividadeAtual.informacoesAdaptacao?.registrosApoioConsiderados || 'Registros diários do profissional de apoio integrados para calibrar o nível de autonomia.'}
             </p>
+            
+            {/* Calibragem AI baseada em evidências */}
+            {(atividadeAtual as AtividadeAdaptadaFull).calibragemContexto && (
+              <div className="mt-2 grid grid-cols-2 gap-1.5 text-[10px]">
+                <div className="bg-slate-50 p-1.5 rounded border border-slate-100">
+                  <span className="block font-bold text-slate-500 uppercase">Cansaço Médio</span>
+                  <span className="text-slate-900 font-bold">{(atividadeAtual as AtividadeAdaptadaFull).calibragemContexto?.cansacoMedio === 'intense' ? 'INTENSO' : (atividadeAtual as AtividadeAdaptadaFull).calibragemContexto?.cansacoMedio === 'moderate' ? 'MODERADO' : 'LEVE/NENHUM'}</span>
+                </div>
+                <div className="bg-slate-50 p-1.5 rounded border border-slate-100">
+                  <span className="block font-bold text-slate-500 uppercase">Foco (min)</span>
+                  <span className="text-slate-900 font-bold">{(atividadeAtual as AtividadeAdaptadaFull).calibragemContexto?.tempoFocoMedio} min</span>
+                </div>
+              </div>
+            )}
+
             <div className="mt-1.5 text-[10px] text-amber-900 bg-amber-50 border border-amber-200 rounded p-1.5">
               “Sugestão gerada a partir do PEI e dos registros de acompanhamento. A validação final deve ser realizada pelo professor e pela equipe pedagógica.”
             </div>
           </div>
         </div>
+
+        {/* Recomendações de Apoio (IA) */}
+        {(atividadeAtual as AtividadeAdaptadaFull).recomendacoesApoioAI && (atividadeAtual as AtividadeAdaptadaFull).recomendacoesApoioAI!.length > 0 && (
+          <div className="mt-3 p-2.5 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <span className="font-bold text-indigo-900 block mb-1 uppercase text-[10px]">Recomendações da Mediação (IA):</span>
+            <ul className="list-disc list-inside space-y-0.5 text-indigo-800 text-[11px]">
+              {(atividadeAtual as AtividadeAdaptadaFull).recomendacoesApoioAI!.map((rec, rIdx) => (
+                <li key={rIdx}>{rec}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Card Informativo de Acessibilidade (Requisito 4) */}
+        {(atividadeAtual.formatoLetra === 'bastao' || atividadeAtual.usarCaixaAlta) && (
+          <div className="mt-3 p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2">
+            <Info className="h-4 w-4 text-emerald-700 shrink-0" />
+            <span className="text-[11px] font-bold text-emerald-900 leading-tight">
+              Recomendações do Apoio aplicadas: Tipografia Lexend em Caixa Alta, redução de distratores e adaptação cognitiva baseada no PEI.
+            </span>
+          </div>
+        )}
       </div>
 
       {/* FOLHA A4 FÍSICA / IMPRESSÃO COM MARGENS DE 10MM E FONTES ACESSÍVEIS */}
@@ -674,7 +712,7 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
           atividadeAtual.estiloTipograficoVisual === 'letra_bastao' ||
           atividadeAtual.estiloTipograficoVisual === 'letra_bastao_desenho_matriz' ||
           atividadeAtual.estiloTipograficoVisual === 'so_desenhos'
-            ? 'uppercase tracking-wider'
+            ? 'uppercase tracking-widest text-lg'
             : ''
         }`}
         style={{
@@ -872,8 +910,17 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
           </div>
         </div>
 
-        {/* QUESTÕES */}
+        {/* QUESTÕES OU CONTEÚDO INTEGRAL DA IA */}
         <div className="space-y-5 pt-1">
+          {/* Se a atividade foi gerada pela IA e retornou um texto único em observacaoProfessor, renderiza aqui */}
+          {atividadeAtual.questoes.length === 0 && atividadeAtual.observacaoProfessor && (
+            <div className={`bloco-atividade-ia p-2 leading-relaxed whitespace-pre-wrap ${
+              (atividadeAtual.formatoLetra === 'bastao' || atividadeAtual.usarCaixaAlta) ? 'font-bold uppercase tracking-widest text-lg' : ''
+            }`}>
+              {renderizarConteudoComTabelas(atividadeAtual.observacaoProfessor)}
+            </div>
+          )}
+
           {atividadeAtual.questoes.map((q) => {
             const isCaixaAlta =
               atividadeAtual.formatoLetra === 'bastao' ||
@@ -924,7 +971,7 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
                     ) : (
                       renderizarConteudoComTabelas(
                         q.enunciado,
-                        `font-semibold text-slate-900 ${isCaixaAlta ? 'font-bold uppercase tracking-wider' : ''}`
+                        `font-semibold text-slate-900 ${isCaixaAlta ? 'font-bold uppercase tracking-widest text-lg' : ''}`
                       )
                     )}
                   </div>
@@ -949,7 +996,7 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
                     dangerouslySetInnerHTML={{ __html: q.ilustracaoSvgOuUrl }}
                   />
                   <div className="text-[11px] text-slate-700 flex-1 space-y-1">
-                    <span className="font-bold uppercase tracking-wider block text-slate-800 text-[10px]">
+                    <span className="font-bold uppercase tracking-widest block text-slate-800 text-[10px]">
                       Ilustração Pedagógica da Matriz:
                     </span>
                     <p className="italic text-slate-600">
@@ -971,7 +1018,7 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
                     <span className="text-[9.5px] font-bold text-slate-600 uppercase block mb-1">
                       1. Modelo em Letra Bastão (Leitura):
                     </span>
-                    <p className="text-base font-bold text-slate-900 tracking-wider uppercase font-sans">
+                    <p className="text-base font-bold text-slate-900 tracking-widest uppercase font-sans">
                       {q.textoCaligraficoPontilhado}
                     </p>
                   </div>
@@ -1023,7 +1070,7 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
                         atividadeAtual.estiloTipograficoVisual === 'letra_bastao' || 
                         atividadeAtual.estiloTipograficoVisual === 'letra_bastao_desenho_matriz' ||
                         atividadeAtual.estiloTipograficoVisual === 'so_desenhos'
-                          ? "font-bold uppercase tracking-wider"
+                          ? "font-bold uppercase tracking-widest text-lg"
                           : ''
                       }`}>
                         {alt}
@@ -1044,6 +1091,36 @@ export const A4SheetPreview: React.FC<A4SheetPreviewProps> = ({
             </div>
           );
         })}
+
+        {/* IMAGENS PEDAGÓGICAS MULTIMODAIS (IA) */}
+        {(atividadeAtual as AtividadeAdaptadaFull).imagensPedagogicas && (atividadeAtual as AtividadeAdaptadaFull).imagensPedagogicas!.length > 0 && (
+          <div className="mt-6 space-y-6">
+            {(atividadeAtual as AtividadeAdaptadaFull).imagensPedagogicas!.map((img, imgIdx) => (
+              <div key={imgIdx} className="break-inside-avoid page-break-inside-avoid flex flex-col items-center gap-2 border-t border-slate-100 pt-4">
+                {img.svgCode ? (
+                  <div 
+                    className="max-w-full max-h-[300px] w-full flex items-center justify-center [&>svg]:max-w-full [&>svg]:max-h-[300px] [&>svg]:h-auto"
+                    dangerouslySetInnerHTML={{ __html: img.svgCode }}
+                  />
+                ) : img.base64 ? (
+                  <img 
+                    src={img.base64} 
+                    alt={img.alt_text} 
+                    className="max-w-full max-h-[300px] object-contain rounded-lg shadow-sm border border-slate-200"
+                  />
+                ) : (
+                  <div className="w-full h-32 bg-slate-50 flex items-center justify-center border border-dashed border-slate-300 rounded-lg">
+                    <ImageIcon className="h-8 w-8 text-slate-300" />
+                  </div>
+                )}
+                <div className="text-center px-4">
+                  <p className="text-[11px] font-bold text-slate-800 uppercase tracking-widest">{img.descricao}</p>
+                  <p className="text-[10px] text-slate-500 italic">Recurso visual de apoio ({img.tipo === 'diagrama' ? 'Diagrama' : img.tipo === 'pictograma' ? 'Pictograma' : 'Organizador Visual'})</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         </div>
 
         {/* ASSINATURA DO PROFESSOR */}

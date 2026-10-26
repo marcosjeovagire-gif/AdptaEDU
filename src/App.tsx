@@ -352,6 +352,8 @@ export default function App() {
     return validateAndSanitizeRegistrosApoio(REGISTROS_APOIO_INICIAIS);
   });
 
+  const [peisArmazenados, setPeisArmazenados] = useState<PeiDocumento[]>([]);
+
   // Modais e Visão Central Master
   const [isMasterDataCenterActive, setIsMasterDataCenterActive] = useState<boolean>(false);
   const [modalImportarMatrizAberto, setModalImportarMatrizAberto] = useState<boolean>(false);
@@ -507,9 +509,18 @@ export default function App() {
       });
     });
 
+    const unsubPeis = ouvirPeisDoFirestore((novosPeis) => {
+      setPeisArmazenados(prev => {
+        const mapa = new Map(prev.map(p => [p.id, p]));
+        novosPeis.forEach(p => mapa.set(p.id, p));
+        return Array.from(mapa.values());
+      });
+    });
+
     return () => {
       unsubAtiv();
       unsubApoio();
+      unsubPeis();
     };
   }, []);
 
@@ -1183,6 +1194,7 @@ export default function App() {
               habilidadesCurriculares={Array.isArray(curriculumSkills) ? curriculumSkills : []}
               atividades={Array.isArray(atividades) ? atividades : []}
               registrosApoio={Array.isArray(registrosApoio) ? registrosApoio : []}
+              peisArmazenados={peisArmazenados}
               onSalvarAtividade={handleSalvarAtividade}
               onAtualizarAtividade={handleAtualizarAtividade}
               onVisualizarAtividadeA4={(ativ) => setAtividadeModalA4(ativ)}

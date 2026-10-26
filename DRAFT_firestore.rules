@@ -1,0 +1,191 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // HELPERS
+    // -------------------------------------------------------------------------
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    // Master Admins
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'marcosjeovagire@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // RBAC Lookup
+    function getUserData() {
+      return get(/databases/$(database)/documents/authorizedUsers/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() && role in getUserData().roles;
+    }
+
+    function isCoordinator() {
+      return isSuperAdmin() || hasRole('coordinator') || hasRole('coordenador') || hasRole('GESTOR');
+    }
+
+    function isTeacher() {
+      return isCoordinator() || hasRole('teacher') || hasRole('professor') || hasRole('PROFESSOR');
+    }
+
+    function isSupport() {
+      return isCoordinator() || hasRole('support') || hasRole('apoio') || hasRole('PROFISSIONAL_DE_APOIO');
+    }
+
+    // -------------------------------------------------------------------------
+    // ENTITY VALIDATORS
+    // -------------------------------------------------------------------------
+
+    function isValidAuthorizedUser(data) {
+      return data.keys().hasAll(['id', 'email', 'roles']) &&
+             data.keys().hasOnly(['id', 'uid', 'name', 'email', 'emailNormalized', 'roles', 'active', 'status', 'schoolId', 'allowedClasses', 'allowedDisciplines', 'createdAt', 'updatedAt']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.email is string && data.email.size() <= 256 &&
+             data.roles is list && data.roles.size() <= 10;
+    }
+
+    function isValidEstudante(data) {
+      return data.keys().hasAll(['id', 'nome', 'turma', 'schoolId']) &&
+             data.keys().hasOnly(['id', 'nome', 'matricula', 'turma', 'anoSerie', 'turno', 'situacao', 'laudo', 'schoolId', 'updatedAt']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.nome is string && data.nome.size() <= 200 &&
+             data.turma is string && data.turma.size() <= 50 &&
+             data.schoolId is string && data.schoolId.size() <= 128;
+    }
+
+    function isValidPei(data) {
+      return data.keys().hasAll(['id', 'studentId']) &&
+             data.keys().hasOnly(['id', 'studentId', 'studentName', 'diagnosis', 'status', 'updatedAt', 'schoolId']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.studentId is string && data.studentId.size() <= 128;
+    }
+
+    function isValidActivity(data) {
+      return data.keys().hasAll(['id', 'estudanteId']) &&
+             data.keys().hasOnly(['id', 'estudanteId', 'estudanteNome', 'turma', 'disciplina', 'conteudo', 'status', 'updatedAt', 'schoolId']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.estudanteId is string && data.estudanteId.size() <= 128;
+    }
+
+    function isValidSupportRecord(data) {
+      return data.keys().hasAll(['id', 'studentId', 'data']) &&
+             data.keys().hasOnly(['id', 'studentId', 'nomeEstudante', 'data', 'updatedAt', 'schoolId']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.studentId is string && data.studentId.size() <= 128;
+    }
+
+    function isValidSchool(data) {
+      return data.keys().hasOnly(['id', 'nome', 'municipio', 'updatedAt']) &&
+             (data.id == null || (data.id is string && data.id.size() <= 128));
+    }
+
+    // -------------------------------------------------------------------------
+    // COLLECTION MATCHES
+    // -------------------------------------------------------------------------
+
+    // 1. Authorized Users
+    match /authorizedUsers/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isCoordinator() && isValidId(userId) && isValidAuthorizedUser(incoming());
+      allow update: if (isCoordinator() || (request.auth.uid == userId)) && 
+                     isValidAuthorizedUser(incoming()) &&
+                     // Protect roles from self-escalation
+                     (isCoordinator() || incoming().roles == existing().roles);
+      allow delete: if isSuperAdmin();
+    }
+
+    // 2. Students
+    match /students/{studentId} {
+      allow list: if (isTeacher() || isSupport()) && resource.data.schoolId == getUserData().schoolId;
+      allow get: if (isTeacher() || isSupport()) && resource.data.schoolId == getUserData().schoolId;
+      allow create: if isTeacher() && isValidId(studentId) && isValidEstudante(incoming()) && incoming().schoolId == getUserData().schoolId;
+      allow update: if isTeacher() && isValidEstudante(incoming()) && incoming().schoolId == getUserData().schoolId && existing().schoolId == getUserData().schoolId;
+      allow delete: if isCoordinator() && existing().schoolId == getUserData().schoolId;
+    }
+
+    // 3. PEI Documents
+    match /peis/{peiId} {
+      allow list: if (isTeacher() || isSupport()) && resource.data.schoolId == getUserData().schoolId;
+      allow get: if (isTeacher() || isSupport()) && resource.data.schoolId == getUserData().schoolId;
+      allow create: if isTeacher() && isValidId(peiId) && isValidPei(incoming()) &&
+                      get(/databases/$(database)/documents/students/$(incoming().studentId)).data.schoolId == getUserData().schoolId;
+      allow update: if isTeacher() && isValidPei(incoming()) && 
+                      existing().schoolId == getUserData().schoolId &&
+                      // Terminal state lock: if already homologado, only coordinator can edit
+                      (existing().status != 'homologado' || isCoordinator());
+      allow delete: if isCoordinator() && existing().schoolId == getUserData().schoolId;
+    }
+
+    // 4. Activities
+    match /activities/{activityId} {
+      allow list: if (isTeacher() || isSupport()) && resource.data.schoolId == getUserData().schoolId;
+      allow get: if (isTeacher() || isSupport()) && resource.data.schoolId == getUserData().schoolId;
+      allow create: if isTeacher() && isValidId(activityId) && isValidActivity(incoming()) &&
+                      get(/databases/$(database)/documents/students/$(incoming().estudanteId)).data.schoolId == getUserData().schoolId;
+      allow update: if isTeacher() && isValidActivity(incoming()) && existing().schoolId == getUserData().schoolId;
+      allow delete: if isCoordinator() && existing().schoolId == getUserData().schoolId;
+    }
+
+    // 5. Support Records
+    match /supportRecords/{recordId} {
+      allow list: if (isTeacher() || isSupport()) && resource.data.schoolId == getUserData().schoolId;
+      allow get: if (isTeacher() || isSupport()) && resource.data.schoolId == getUserData().schoolId;
+      allow create: if isSupport() && isValidId(recordId) && isValidSupportRecord(incoming()) &&
+                      get(/databases/$(database)/documents/students/$(incoming().studentId)).data.schoolId == getUserData().schoolId;
+      allow update: if isSupport() && isValidSupportRecord(incoming()) && existing().schoolId == getUserData().schoolId;
+      allow delete: if isCoordinator() && existing().schoolId == getUserData().schoolId;
+    }
+
+    // 6. Schools
+    match /schools/{schoolId} {
+      allow read: if isSignedIn() && (isSuperAdmin() || schoolId == getUserData().schoolId);
+      allow create: if isSuperAdmin() && isValidId(schoolId) && isValidSchool(incoming());
+      allow update: if isCoordinator() && schoolId == getUserData().schoolId && isValidSchool(incoming());
+      allow delete: if isSuperAdmin();
+    }
+
+    // Interaction collections (Legacy support or internal)
+    match /pedagogicalProfiles/{profileId} {
+      allow read: if isTeacher();
+      allow write: if isTeacher();
+    }
+
+    match /curriculumMatrices/{matrixId} {
+      allow read: if isSignedIn();
+      allow write: if isCoordinator();
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isCoordinator();
+      allow create: if isSignedIn();
+    }
+  }
+}

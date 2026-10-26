@@ -272,12 +272,22 @@ export const LoginView: React.FC<LoginViewProps> = ({
             </div>
 
             {/* Título AdaptaEdu Escolar & Subtítulo */}
-            <div className="text-center">
-              <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                 Adapta<span className="text-emerald-700">Edu</span> Escolar
               </h2>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Sistema de Atividades Pedagógicas Adaptadas
+              <div className="flex items-center justify-center gap-2">
+                <div className="h-px w-10 bg-slate-200"></div>
+                <p className="text-[12px] uppercase tracking-[0.2em] text-slate-500 font-black">
+                  Pedagogia Inclusiva
+                </p>
+                <div className="h-px w-10 bg-slate-200"></div>
+              </div>
+              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest">
+                Colégio Estadual Olynto Pereira de Castro
+              </p>
+              <p className="text-[10px] text-emerald-700 font-extrabold bg-emerald-50 px-3 py-1 rounded-full inline-block border border-emerald-100">
+                Matriz Curricular SEDUC-GO 2026 • SIAP Integrado
               </p>
             </div>
 

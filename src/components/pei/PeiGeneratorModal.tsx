@@ -609,10 +609,10 @@ export const PeiGeneratorModal: React.FC<PeiGeneratorModalProps> = ({
         period,
       });
 
-      setEtapa1(res.etapa1);
-      setEtapa2(res.etapa2);
-      setPotencialidades(res.potencialidades);
-      setNecessidadesDificuldades(res.necessidadesDificuldades);
+      if (res.etapa1) setEtapa1(res.etapa1);
+      if (res.etapa2) setEtapa2(res.etapa2);
+      if (res.potencialidades) setPotencialidades(res.potencialidades);
+      if (res.necessidadesDificuldades) setNecessidadesDificuldades(res.necessidadesDificuldades);
       if (res.areaAcademica && res.areaAcademica.length > 0) {
         setAreaAcademica(res.areaAcademica);
       }

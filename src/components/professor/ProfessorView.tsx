@@ -34,7 +34,7 @@ import {
   RegistroAcompanhamentoApoio,
   PeiDocumento
 } from '../../types';
-import { gerarAtividadeEstruturada, validarRequisitosAtividade } from '../../utils/activityGenerator';
+import { gerarAtividadeEstruturada, validarRequisitosAtividade, gerarAtividadeInteligente } from '../../utils/activityGenerator';
 import { buildActivityContext } from '../../server/pedagogicalContextService';
 import { consultarMatriz } from '../../data/matrizesOficiaisSeduc2026';
 import { A4SheetPreview } from '../a4/A4SheetPreview';
@@ -178,6 +178,7 @@ export const ProfessorView: React.FC<ProfessorViewProps> = ({
   const [baixandoConsolidado, setBaixandoConsolidado] = useState<boolean>(false);
   const [feedbackDownloadConsolidado, setFeedbackDownloadConsolidado] = useState<string | null>(null);
   const [peisLocais, setPeisLocais] = useState<PeiDocumento[]>(peisArmazenados || []);
+  const [isGerandoAtividade, setIsGerandoAtividade] = useState<boolean>(false);
 
   useEffect(() => {
     if (peisArmazenados && peisArmazenados.length > 0) {
@@ -470,7 +471,9 @@ export const ProfessorView: React.FC<ProfessorViewProps> = ({
     const habCodigo = 'skillCode' in habilidadeSelecionada ? habilidadeSelecionada.skillCode : habilidadeSelecionada.codigo;
     const habDesc = 'skillDescription' in habilidadeSelecionada ? habilidadeSelecionada.skillDescription : habilidadeSelecionada.descricao;
 
-    const nova = gerarAtividadeEstruturada({
+    setIsGerandoAtividade(true);
+    
+    const params = {
       estudante: estudanteSelecionado,
       perfilPedagogico: perfilAutorizado || {
         id: 'perfil-temp',
@@ -511,44 +514,29 @@ export const ProfessorView: React.FC<ProfessorViewProps> = ({
         status: 'aprovada',
       },
       quantidadeQuestoes,
-      tipoQuestoes: estiloTipograficoVisual === 'so_desenhos' ? 'associacao' : tipoQuestoes,
-      observacaoProfessor,
-      alinhadaAoPei,
-      peiAlinhamentoDetalhes: peiAlinhamentoDetalhes.trim() || undefined,
-      tipoAtividade: estiloTipograficoVisual === 'so_desenhos' 
-        ? 'desenhos' 
-        : estiloTipograficoVisual === 'letra_bastao_desenho_matriz' 
-        ? 'desenhos' 
-        : (estiloTipograficoVisual === 'letra_cursiva' || estiloTipograficoVisual === 'letra_bastao_e_cursiva') 
-        ? 'cursiva' 
-        : 'multipla_escolha',
-      estiloTipograficoVisual,
-      estiloDesenho,
+      tipoQuestoes,
       formatoLetra: (estiloTipograficoVisual === 'letra_bastao' || estiloTipograficoVisual === 'letra_bastao_desenho_matriz' || estiloTipograficoVisual === 'so_desenhos') ? 'bastao' : 'cursiva',
-      usarCaixaAlta: (estiloTipograficoVisual === 'letra_bastao' || estiloTipograficoVisual === 'letra_bastao_desenho_matriz' || estiloTipograficoVisual === 'so_desenhos'),
-      apoioVisual: (estiloTipograficoVisual === 'so_desenhos' || estiloTipograficoVisual === 'letra_bastao_desenho_matriz') ? {
-        habilitado: true,
-        tipo: estiloTipograficoVisual === 'so_desenhos' ? 'desenhos' : (estiloDesenho === 'preto_e_branco_colorir' ? 'colorir' : 'desenhos'),
-        estilo: estiloDesenho === 'colorido' ? 'colorido' : 'preto_e_branco',
-        quantidadePorPagina: quantidadeQuestoes,
-      } : undefined,
-      opcoesCursiva: (estiloTipograficoVisual === 'letra_cursiva' || estiloTipograficoVisual === 'letra_bastao_e_cursiva') ? {
-        tipoPauta: 'caligrafica',
-        tracadoPontilhado: true,
-        ladoALadoForma: estiloTipograficoVisual === 'letra_bastao_e_cursiva',
-        tamanho: 'medio',
-        contrastado: true,
-      } : undefined,
-      ajusteRelatoApoio: (relatoApoioDetectado?.houveDificuldade && aplicarAjusteApoio) ? {
-        houveDificuldadeRelatada: true,
-        relatoTexto: `Diário de Bordo do Apoio (${new Date(relatoApoioDetectado.registro.data).toLocaleDateString('pt-BR')}): ${relatoApoioDetectado.texto}`,
-        recomendacao: 'Fragmentação de comandos, maior suporte visual ilustrado e redução de alternativas.'
-      } : undefined,
-    });
+      registrosApoioConsultados: registrosApoio?.filter(r => r.studentId === estudanteSelecionado.id).slice(0, 5) || [],
+      estiloDesenho
+    };
 
-    setAtividadeAtiva(nova);
-    onSalvarAtividade(nova);
-    setEtapa('revisar');
+    gerarAtividadeInteligente(params as any)
+      .then(nova => {
+        setAtividadeAtiva(nova);
+        onSalvarAtividade(nova);
+        setEtapa('revisar');
+      })
+      .catch(err => {
+        console.error('Erro ao gerar atividade inteligente:', err);
+        alert('Erro ao gerar atividade via IA. Tentando fallback local...');
+        const fallback = gerarAtividadeEstruturada(params as any);
+        setAtividadeAtiva(fallback);
+        onSalvarAtividade(fallback);
+        setEtapa('revisar');
+      })
+      .finally(() => {
+        setIsGerandoAtividade(false);
+      });
   };
 
   const handleBaixarRelatorioConsolidado = (aluno: Estudante) => {
@@ -1303,11 +1291,20 @@ export const ProfessorView: React.FC<ProfessorViewProps> = ({
                   <button
                     type="button"
                     onClick={handleValidarContexto}
-                    disabled={habilidadesAprovadas.length === 0}
+                    disabled={habilidadesAprovadas.length === 0 || isGerandoAtividade}
                     className="w-full py-3.5 px-6 rounded-xl text-sm font-bold text-white bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-xs"
                   >
-                    <span>8. Validar e Gerar Atividade</span>
-                    <ArrowRight className="h-4 w-4" />
+                    {isGerandoAtividade ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Gerando com Inteligência Artificial...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>8. Validar e Gerar Atividade</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
                   </button>
                 </div>
 

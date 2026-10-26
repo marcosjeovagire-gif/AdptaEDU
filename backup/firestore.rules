@@ -1,0 +1,214 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==========================================
+    // FUNÇÕES DE SEGURANÇA E CONTROLE DE ACESSO
+    // ==========================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    // Administrador Master ou e-mail institucional homologado
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.email != null && (
+          request.auth.token.email.lower() == 'marcosjeovagire@gmail.com' ||
+          request.auth.token.email.lower() == 'marcos.ferreira@admin.educa.go.gov.br'
+        )) ||
+        (request.auth.token.keys().hasAny(['admin', 'superadmin']) && 
+         (request.auth.token.admin == true || request.auth.token.superadmin == true))
+      );
+    }
+
+    // Documento de usuário na coleção authorizedUsers
+    function hasUserDoc() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/authorizedUsers/$(request.auth.uid));
+    }
+
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/authorizedUsers/$(request.auth.uid));
+    }
+
+    function isAuthorizedUser() {
+      return isSuperAdmin() || (
+        isAuthenticated() && (
+          !hasUserDoc() ||
+          getUserDoc().data.active != false
+        )
+      );
+    }
+
+    function hasCoordinatorRole() {
+      return isSuperAdmin() || (
+        hasUserDoc() && (
+          'coordinator' in getUserDoc().data.roles ||
+          'coordenador' in getUserDoc().data.roles ||
+          'GESTOR' in getUserDoc().data.roles ||
+          'superadmin' in getUserDoc().data.roles
+        )
+      );
+    }
+
+    function hasTeacherRole() {
+      return hasCoordinatorRole() || (
+        hasUserDoc() && (
+          'teacher' in getUserDoc().data.roles ||
+          'professor' in getUserDoc().data.roles ||
+          'PROFESSOR' in getUserDoc().data.roles
+        )
+      );
+    }
+
+    function hasSupportRole() {
+      return hasCoordinatorRole() || (
+        hasUserDoc() && (
+          'PROFISSIONAL_DE_APOIO' in getUserDoc().data.roles ||
+          'support' in getUserDoc().data.roles ||
+          'apoio' in getUserDoc().data.roles
+        )
+      );
+    }
+
+    // ==========================================
+    // REGRAS DAS COLEÇÕES INSTITUCIONAIS
+    // ==========================================
+
+    // 1. Usuários Autorizados (authorizedUsers)
+    match /authorizedUsers/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isSuperAdmin() || hasCoordinatorRole() || (isAuthenticated() && request.auth.uid == userId);
+      allow update: if isSuperAdmin() || hasCoordinatorRole() || (isAuthenticated() && request.auth.uid == userId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // 2. Estudantes da Educação Especial (students) - Apenas perfis pedagógicos autorizados
+    match /students/{studentId} {
+      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
+      allow create, update: if hasTeacherRole() || hasCoordinatorRole() || isSuperAdmin();
+      allow delete: if hasCoordinatorRole() || isSuperAdmin();
+    }
+
+    // 3. Perfis Pedagógicos
+    match /pedagogicalProfiles/{profileId} {
+      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
+      allow write: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
+    }
+
+    // 4. Habilidades e Matrizes Curriculares (skills / curriculumMatrices)
+    match /skills/{skillId} {
+      allow read: if isAuthenticated();
+      allow write: if hasCoordinatorRole() || isSuperAdmin();
+    }
+
+    match /curriculumMatrices/{matrixId} {
+      allow read: if isAuthenticated();
+      allow write: if hasCoordinatorRole() || isSuperAdmin();
+    }
+
+    match /curriculumSkills/{skillId} {
+      allow read: if isAuthenticated();
+      allow write: if hasCoordinatorRole() || isSuperAdmin();
+    }
+
+    match /curriculumDocuments/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if hasCoordinatorRole() || isSuperAdmin();
+    }
+
+    // 5. Atividades Adaptadas (activities)
+    match /activities/{activityId} {
+      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
+      allow create: if hasTeacherRole() || hasCoordinatorRole() || isSuperAdmin();
+      allow update: if hasCoordinatorRole() || isSuperAdmin() || (
+        hasTeacherRole() && (
+          !('professorId' in resource.data) ||
+          resource.data.professorId == request.auth.uid
+        )
+      );
+      allow delete: if hasCoordinatorRole() || isSuperAdmin() || (
+        hasTeacherRole() && (
+          !('professorId' in resource.data) ||
+          resource.data.professorId == request.auth.uid
+        )
+      );
+    }
+
+    // 6. Registros do Profissional de Apoio Escolar (supportRecords / supportLogs)
+    match /supportRecords/{recordId} {
+      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
+      allow create, update: if hasSupportRole() || hasCoordinatorRole() || isSuperAdmin();
+      allow delete: if hasCoordinatorRole() || isSuperAdmin();
+    }
+
+    match /supportLogs/{logId} {
+      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
+      allow create, update: if hasSupportRole() || hasCoordinatorRole() || isSuperAdmin();
+      allow delete: if hasCoordinatorRole() || isSuperAdmin();
+    }
+
+    // 7. Planos Educacionais Individualizados (PEI) e Relatórios
+    match /peis/{peiId} {
+      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
+      allow write: if hasCoordinatorRole() || hasTeacherRole() || hasSupportRole() || isSuperAdmin();
+    }
+
+    match /peiDocuments/{peiId} {
+      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
+      allow write: if hasCoordinatorRole() || hasTeacherRole() || hasSupportRole() || isSuperAdmin();
+    }
+
+    match /bimonthlyReports/{reportId} {
+      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
+      allow write: if hasCoordinatorRole() || hasTeacherRole() || hasSupportRole() || isSuperAdmin();
+    }
+
+    match /reports/{reportId} {
+      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
+      allow write: if hasCoordinatorRole() || hasTeacherRole() || hasSupportRole() || isSuperAdmin();
+    }
+
+    // 8. Configurações da Unidade Escolar (schools)
+    match /schools/{schoolId} {
+      allow read: if isAuthenticated();
+      allow write: if hasCoordinatorRole() || isSuperAdmin();
+    }
+
+    // 9. Metadados de Sincronização e Auditoria
+    match /syncMeta/{metaId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if hasCoordinatorRole() || isSuperAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Imutabilidade estrita da trilha de auditoria
+    }
+
+    match /driveFiles/{fileId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /importBatches/{batchId} {
+      allow read, write: if hasCoordinatorRole() || isSuperAdmin();
+    }
+
+    match /documents/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if hasCoordinatorRole() || isSuperAdmin();
+    }
+  }
+}

@@ -1,0 +1,60 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.email != null && (
+          request.auth.token.email.lower() == 'marcosjeovagire@gmail.com' ||
+          request.auth.token.email.lower() == 'marcos.ferreira@admin.educa.go.gov.br'
+        )) ||
+        (request.auth.token.keys().hasAny(['admin', 'superadmin']) && 
+         (request.auth.token.admin == true || request.auth.token.superadmin == true))
+      );
+    }
+
+    // Arquivos e logos da unidade escolar
+    match /schools/{schoolId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin() || (isAuthenticated() &&
+                      request.resource.size < 10 * 1024 * 1024 &&
+                      (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf'));
+    }
+
+    // Avatares e fotos de perfil de usuários - apenas o próprio usuário
+    match /users/{userId}/avatar/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId &&
+                      request.resource.size < 5 * 1024 * 1024 &&
+                      request.resource.contentType.matches('image/.*');
+    }
+
+    // Documentos oficiais, PEIs, relatórios e fotos de mediação pedagógica
+    match /documents/{docId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() &&
+                      request.resource.size < 25 * 1024 * 1024 &&
+                      (request.resource.contentType == 'application/pdf' || request.resource.contentType.matches('image/.*'));
+    }
+
+    // Atividades adaptadas e anexos pedagógicos em PDF
+    match /activities/{activityId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() &&
+                      request.resource.size < 25 * 1024 * 1024 &&
+                      (request.resource.contentType == 'application/pdf' || request.resource.contentType.matches('image/.*') || request.resource.contentType == 'image/svg+xml');
+    }
+
+    // Backups institucionais gerados pela coordenação - exclusivo administradores
+    match /backups/{fileName} {
+      allow read: if isSuperAdmin();
+      allow write: if isSuperAdmin() &&
+                      request.resource.size < 50 * 1024 * 1024 &&
+                      (request.resource.contentType == 'application/json' || request.resource.contentType == 'application/zip' || request.resource.contentType == 'application/octet-stream');
+    }
+  }
+}

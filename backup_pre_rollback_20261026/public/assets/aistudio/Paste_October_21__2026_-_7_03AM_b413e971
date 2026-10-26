@@ -1,0 +1,975 @@
+PROMPT MESTRE DE CORREÇÃO ARQUITETURAL E APRIMORAMENTO INTEGRAL — ADAPTAEDU ESCOLAR (GOOGLE AI STUDIO)
+
+INSTRUÇÃO DE USO: Copie todo o texto abaixo da linha divisória e cole diretamente no chat do Google AI Studio onde está o seu projeto adaptaedu-escolar.
+
+Atue como um Engenheiro de Software Sênior, Arquiteto de Sistemas Cloud/Firebase e Especialista em Tecnologia Educacional Inclusiva (SEDUC-GO).
+
+Realizei uma auditoria profunda no código-fonte atual do projeto AdaptaEdu Escolar e identifiquei falhas críticas de sincronização entre múltiplos computadores, autenticação no Firestore, persistência no Google Drive, desconexão do motor de IA (@google/genai) no gerador de atividades e código desconectado (adaptacaoService.ts) para o fluxo dos itens 22 a 51.
+
+Sua missão é executar todas as correções técnicas abaixo e implementar integralmente as especificações das Seções 22 a 51, modificando diretamente os arquivos do projeto sem quebrar nada do que já existe.
+
+PARTE 1 — CORREÇÕES CRÍTICAS DE ARQUITETURA, MULTI-COMPUTADOR, DRIVE E IA
+
+1. CORREÇÃO DA SINCRONIZAÇÃO EM REDE E MULTI-COMPUTADOR (CLOUD FIRESTORE + BACKEND SYNC)
+
+Problema atual diagnosticado no código:
+
+Quando um usuário entra pelo e-mail educacional ou acesso rápido (LoginView.tsx), a sessão é criada apenas no sessionStorage, deixando request.auth == null no Firebase. Além disso, firestore.rules exige exists(/databases/$(database)/documents/authorizedUsers/$(request.auth.uid)), bloqueando a leitura e gravação no Firestore (permission-denied) quando acessado em outros computadores.
+
+O endpoint /api/sync-state em server.ts existe, mas nunca é chamado pelo frontend.
+
+No ProfissionalApoioView.tsx e App.tsx, os lançamentos diários do Profissional de Apoio (supportRecords), atividades (activities), estudantes (students), matrizes (curriculumMatrices), habilidades (curriculumSkills), PEIs (peis) e notificações precisam sincronizar automaticamente entre todos os computadores da rede escolar.
+
+Como corrigir obrigatoriamente:
+
+Em firestore.rules:
+
+Ajuste as regras para permitir leitura e escrita seguras tanto por usuários autenticados via Google OAuth/Anonymous Auth quanto pela validação institucional da escola (schoolId == 'olynto-pereira-castro'), garantindo que supportRecords, activities, peis, students, curriculumMatrices, curriculumSkills, notifications, driveFiles e schools nunca bloqueiem lançamentos legítimos feitos por qualquer computador da escola.
+
+Em src/services/escolaFirestoreService.ts e src/App.tsx:
+
+Garanta que ao iniciar o aplicativo (ou fazer login em qualquer perfil), o Firebase autentique silenciosamente (ou mantenha sessão OAuth/Anônima caso não haja sessão Google ativa) para que o cliente Firestore tenha conexão ativa em tempo real.
+
+Implemente e conecte em App.tsx listeners em tempo real (onSnapshot) E sincronização de fallback com /api/sync-state (GET e POST em server.ts, com persistência em arquivo JSON no servidor /tmp/adaptaedu_network_db.json ou ./data/network_state.json) para:
+
+registrosApoio (supportRecords) — Sincronização bidirecional imediata: tudo o que o Profissional de Apoio lançar no Computador A deve aparecer instantaneamente no Computador B (Coordenação, Professor ou outro Apoio) e estar disponível para emissão de relatórios em qualquer máquina;
+
+atividades (activities);
+
+estudantes (students);
+
+matrizesCurriculares e curriculumSkills;
+
+peis (peis);
+
+notificacoes (notifications).
+
+Adicione uma função forcarSincronizacaoCompletaDaRede() chamada automaticamente ao abrir modais de Relatório Mensal, Relatório Consolidado, Gerador de Atividades e ao clicar em "Sincronizar Rede", que mescla (merge por id e updatedAt mais recente) os dados do Firestore + /api/sync-state + IndexedDB + localStorage.
+
+2. CORREÇÃO DO ARMAZENAMENTO NO GOOGLE DRIVE E MIGRAÇÃO DE DADOS DO APOIO
+
+Problema atual diagnosticado no código:
+
+Em src/services/driveGateway.ts, DriveUserOAuthGateway é um mock que gera IDs falsos (drive-file-...) apenas no localStorage.
+
+Em src/services/googleDriveService.ts, cachedAccessToken fica apenas em variável volátil de memória (se o usuário recarregar a página F5, o token se perde e o Drive desconecta).
+
+Os registros diários do Profissional de Apoio e os relatórios/atividades emitidos não estão sendo salvos automaticamente na pasta compartilhada da rede/Drive nem indexados no Firestore (driveFiles) para que outros computadores vejam os arquivos gerados.
+
+Como corrigir obrigatoriamente:
+
+Em src/services/googleDriveService.ts e src/services/driveGateway.ts:
+
+Unifique driveGateway.ts para usar a implementação real de googleDriveService.ts.
+
+Armazene o token OAuth temporariamente em sessionStorage (com verificação de expiração e renovação silenciosa ou aviso claro de reconexão) para que recarregar a página (F5) não desconecte o Google Drive durante o expediente.
+
+Sempre que um arquivo (PDF de Atividade Adaptada, PDF de Relatório Mensal do Apoio, PDF de Relatório Consolidado, Foto de Diário de Bordo ou JSON de Lançamentos Diários do Apoio) for enviado ao Google Drive:
+
+Salve na estrutura oficial de pastas no Google Drive: AdaptaEdu Escolar - Registros e Imagens -> [Série/Turma] -> subpastas organizadas (Atividades_Adaptadas, Relatorios_Profissional_Apoio, Diarios_de_Bordo);
+
+Grave também o metadado e o link (webViewLink, fileId, studentId, serie, tipo, uploadedAt, uploadedBy) na coleção driveFiles do Firestore e no /api/sync-state, para que qualquer computador da rede liste e abra os arquivos salvos no Drive!
+
+Em src/components/apoio/ProfissionalApoioView.tsx, RelatorioMensalApoioModal.tsx e relatorioApoioExportService.ts:
+
+Ao salvar um lançamento diário do Profissional de Apoio (handleSalvarRegistro):
+
+Salve imediatamente no IndexedDB, no Cloud Firestore (supportRecords), no /api/sync-state do servidor e, se o Google Drive estiver conectado, sincronize o registro e anexos na pasta da série no Drive e atualize o backup automático da rede.
+
+Ao emitir qualquer relatório (Relatório Mensal PDF, Relatório Consolidado PDF ou CSV) em qualquer computador:
+
+Primeiro busque/sincronize todos os registros mais recentes do Firestore e da rede (/api/sync-state);
+
+Gere o documento PDF/CSV incluindo 100% dos lançamentos feitos pelos profissionais de apoio em qualquer dispositivo;
+
+Se o Google Drive estiver conectado, envie automaticamente uma cópia do PDF gerado para a pasta da série correspondente no Google Drive (uploadPdfBlob).
+
+3. CORREÇÃO E INTEGRAÇÃO REAL DO MOTOR DE IA (@google/genai) NA GERAÇÃO DE ATIVIDADES E IMAGENS
+
+Problema atual diagnosticado no código:
+
+Em server.ts, o modelo configurado é 'gemini-3.8-flash', que não existe, causando erro na API.
+
+Em src/components/professor/ProfessorView.tsx, o botão de gerar atividade chama apenas gerarAtividadeEstruturada() (src/utils/activityGenerator.ts), que usa frases estáticas fixas e apenas 10 SVGs fixos no código, sem chamar a IA!
+
+O gerador PDF nativo (src/services/atividadeA4PdfService.ts) ignora as ilustrações SVG (q.ilustracaoSvgOuUrl) quando renderiza pelo fallback programático.
+
+Como corrigir obrigatoriamente:
+
+Corrija o modelo Gemini e a chamada ao SDK @google/genai:
+
+Utilize gemini-2.5-flash como modelo padrão (process.env.GEMINI_MODEL || 'gemini-2.5-flash') tanto em server.ts quanto em um novo serviço cliente/híbrido src/services/aiActivityEngineService.ts (que utiliza process.env.GEMINI_API_KEY via @google/genai diretamente ou via /api/ai/gerar-atividade, com fallback inteligente caso offline).
+
+Geração de Atividades e Ilustrações Pedagógicas Sob Medida pela IA:
+
+Quando o professor solicitar a geração da atividade, o motor de IA deverá receber as 3 Fontes Obrigatórias (Seção 23):
+
+Fonte 1 (Matriz Curricular): componente, ano/série, turma, bimestre, unidade temática, objeto de conhecimento, conteúdo previsto, código oficial da habilidade e descrição integral da habilidade;
+
+Fonte 2 (Planejamento do Professor): conteúdo específico da aula, objetivo, formato, tipo de questão, quantidade de questões, nível de dificuldade (introdutório, básico, intermediário, avançado, personalizado), opções visuais (letra bastão, caixa alta, desenho, uma questão por página, etc.);
+
+Fonte 3 (Necessidades Pedagógicas Registradas): dados autorizados do PEI do estudante, Perfil Pedagógico, último relatório pertinente do Profissional de Apoio, barreiras observadas e estratégias que funcionaram.
+
+O motor de IA deverá gerar:
+
+Questões inéditas, contextualizadas e pedagogicamente ricas sobre o conteúdo exato e a habilidade da matriz (proibido usar frases genéricas como "A ilustração representa a aplicação correta de..." ou placeholders);
+
+Ilustrações Vetoriais SVG Pedagógicas Sob Medida (svgIlustracao) geradas especificamente para cada questão e conteúdo da matriz (com viewBox="0 0 240 180", traços nítidos stroke-width="3", alto contraste, formas claras e didáticas, perfeitas para versão colorida ou preto e branco para colorir/completar/ligar), além de aprimorar a biblioteca de fallback local para dezenas de temas curriculares caso o dispositivo esteja sem internet;
+
+Bloco 1 (Material do Estudante), Bloco 2 (Orientações ao Professor + Gabarito + Critérios de Avaliação Processual) e Bloco 3 (Orientações ao Profissional de Apoio) (Seções 36 e 40).
+
+Renderização de Imagens/SVGs no PDF A4 (src/services/atividadeA4PdfService.ts):
+
+Garanta que tanto a exportação via html2canvas quanto o gerador programático jsPDF convertam e desenhem todas as ilustrações SVG/imagens (ilustracaoSvgOuUrl), quadros de resposta por desenho e pautas caligráficas dentro da folha A4 sem jamais omitir ou cortar figuras.
+
+PARTE 2 — ESPECIFICAÇÃO INTEGRAL OBRIGATÓRIA (SEÇÕES 22 A 51)
+
+Implemente e verifique rigorosamente cada um dos itens abaixo no código:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+22. MANUTENÇÃO INTEGRAL DO SISTEMA EXISTENTE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MANTENHA INTEGRALMENTE TODAS AS REGRAS, CONFIGURAÇÕES, FUNÇÕES, INTEGRAÇÕES, TELAS, MÓDULOS E INSTRUÇÕES ANTERIORES DESTE PROJETO.
+As instruções seguintes são complementares e destinam-se principalmente ao aprimoramento do módulo de geração de atividades pedagógicas adaptadas, sincronização em rede/Drive e integração com o relatório do profissional de apoio.
+NÃO altere indevidamente:
+
+configurações atuais do projeto;
+
+estrutura do banco de dados sem necessidade comprovada;
+
+variáveis de ambiente existentes;
+
+credenciais e integrações já configuradas;
+
+regras de autenticação que estejam funcionando corretamente;
+
+nomes das coleções e campos já utilizados;
+
+identidade visual institucional (Colégio Estadual Olynto Pereira de Castro / SEDUC-GO);
+
+perfis de acesso;
+
+cadastros existentes (87 servidores e estudantes oficiais);
+
+documentos armazenados;
+
+funcionalidades que já estejam operacionais;
+
+estrutura dos PEIs;
+
+relatórios já preenchidos;
+
+matrizes curriculares importadas;
+
+vínculos entre estudantes, turmas e profissionais;
+
+permissões existentes, exceto quando houver falha de segurança ou bloqueio indevido de sincronização;
+
+configurações de impressão;
+
+configurações do Firebase e Google Drive que estejam corretas.
+Antes de alterar qualquer configuração, faça uma análise de impacto.
+Somente modifique configurações quando existir erro comprovado, incompatibilidade, risco de segurança ou necessidade indispensável para fazer a funcionalidade operar. Nesses casos:
+
+preserve os valores existentes;
+
+crie um checkpoint antes da alteração;
+
+documente exatamente o que foi alterado;
+
+mantenha compatibilidade com os dados anteriores;
+
+não exponha credenciais;
+
+não apague configurações para recriá-las;
+
+teste a alteração antes de considerá-la concluída.
+Não recrie o sistema do zero.
+Não remova funcionalidades para simplificar o desenvolvimento.
+Não transforme funcionalidades reais em demonstrações.
+Não substitua dados do banco por dados simulados.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+23. OBJETIVO DO APRIMORAMENTO DA GERAÇÃO DE ATIVIDADES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Aprimore profundamente o módulo de criação de atividades do professor (ProfessorView.tsx, activityGenerator.ts, aiActivityEngineService.ts) para que cada atividade seja construída com base em três fontes integradas e obrigatórias:
+FONTE 1 — MATRIZ CURRICULAR
+
+componente curricular;
+
+ano ou série;
+
+turma;
+
+bimestre;
+
+unidade temática;
+
+objeto de conhecimento;
+
+conteúdo previsto;
+
+código da habilidade;
+
+descrição completa da habilidade;
+
+expectativas ou objetivos de aprendizagem;
+
+demais campos existentes na matriz importada.
+FONTE 2 — PLANEJAMENTO E SOLICITAÇÃO DO PROFESSOR
+
+conteúdo proposto pelo professor;
+
+objetivo da aula;
+
+tipo de atividade;
+
+quantidade de questões;
+
+nível de dificuldade;
+
+forma de apresentação;
+
+recursos solicitados;
+
+características visuais;
+
+orientações de aplicação;
+
+critérios de avaliação.
+FONTE 3 — NECESSIDADES PEDAGÓGICAS REGISTRADAS
+
+PEI do estudante, quando houver;
+
+adaptações já autorizadas;
+
+atividades anteriores;
+
+desempenho registrado;
+
+observações pedagógicas;
+
+relatório do profissional de apoio;
+
+dificuldades observadas na realização da atividade;
+
+estratégias que funcionaram;
+
+estratégias que não funcionaram;
+
+nível de ajuda necessário;
+
+recursos utilizados;
+
+resposta do estudante à atividade.
+A atividade final deverá resultar da integração dessas três fontes, sem inventar dados, habilidades, diagnósticos ou informações sobre o estudante.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+24. FLUXO OBRIGATÓRIO PARA CRIAÇÃO DA ATIVIDADE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ao solicitar uma nova atividade, o sistema deverá seguir esta sequência:
+
+identificar o usuário autenticado;
+
+confirmar que o usuário possui perfil de Professor ou outra permissão autorizada;
+
+identificar a escola;
+
+identificar a turma;
+
+identificar o estudante, quando a atividade for individualizada;
+
+identificar o ano ou a série;
+
+identificar o componente curricular;
+
+identificar o bimestre selecionado;
+
+consultar a matriz curricular correspondente;
+
+carregar as unidades temáticas disponíveis;
+
+carregar os objetos de conhecimento disponíveis;
+
+carregar os conteúdos existentes;
+
+carregar as habilidades correspondentes;
+
+verificar o conteúdo informado pelo professor;
+
+relacionar o conteúdo informado com a matriz;
+
+consultar as adaptações autorizadas no PEI;
+
+consultar o último relatório pertinente do profissional de apoio;
+
+consultar o histórico de atividades anteriores;
+
+identificar dificuldades registradas;
+
+sugerir a estrutura da atividade;
+
+permitir revisão pelo professor;
+
+gerar a atividade;
+
+apresentar uma visualização antes de salvar;
+
+permitir edição manual;
+
+permitir aprovação ou rejeição;
+
+salvar somente após ação consciente do professor (NÃO salve automaticamente como versão definitiva antes de o professor revisar e clicar em "Aprovar e Salvar" ou "Salvar Rascunho");
+
+gerar versão para impressão;
+
+permitir baixar em PDF.
+O professor deverá permanecer responsável pela validação pedagógica final.
+Nenhuma atividade deverá ser automaticamente aplicada ao estudante sem revisão e aprovação do professor.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+25. VINCULAÇÃO OBRIGATÓRIA COM A MATRIZ CURRICULAR
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Toda atividade gerada deverá estar vinculada a um registro verdadeiro da matriz curricular cadastrada ou importada no sistema.
+A atividade deverá registrar internamente:
+
+identificador da matriz utilizada;
+
+componente curricular;
+
+ano ou série;
+
+bimestre;
+
+unidade temática;
+
+objeto de conhecimento;
+
+conteúdo;
+
+código da habilidade;
+
+descrição integral da habilidade;
+
+data da geração;
+
+professor responsável;
+
+estudante ou turma de destino;
+
+versão da atividade;
+
+origem da habilidade;
+
+origem do conteúdo.
+Ao selecionar componente curricular, ano ou série e bimestre, o sistema deverá filtrar somente as informações correspondentes.
+Não misture habilidades de:
+
+componentes curriculares diferentes;
+
+anos ou séries diferentes;
+
+bimestres diferentes;
+
+matrizes diferentes;
+
+arquivos diferentes sem indicação da origem.
+Não invente códigos de habilidades.
+Não complete códigos incompletos por suposição.
+Não modifique a redação oficial da habilidade armazenada.
+Caso o professor informe um conteúdo que não tenha correspondência clara com a matriz selecionada:
+
+não invente uma associação;
+
+mostre a mensagem “Não foi encontrada correspondência segura entre o conteúdo informado e a matriz selecionada”;
+
+apresente resultados próximos apenas como sugestões;
+
+identifique cada sugestão como “correspondência sugerida”;
+
+mostre unidade temática, objeto de conhecimento, conteúdo e habilidade;
+
+exija que o professor escolha ou confirme a associação;
+
+permita selecionar outra matriz, bimestre, componente ou conteúdo;
+
+não gere a versão final sem uma habilidade validada, salvo quando o professor registrar justificativa pedagógica.
+Se a matriz admitir atividades sem código de habilidade, preserve essa condição e registre a justificativa, sem gerar códigos fictícios.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+26. BUSCA INTELIGENTE DO CONTEÚDO NA MATRIZ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Implemente uma busca inteligente, precisa e rastreável na matriz curricular (curriculumMatrixService.ts e ProfessorView.tsx).
+A busca deverá considerar:
+
+correspondência exata;
+
+palavras-chave;
+
+variações linguísticas;
+
+singular e plural;
+
+termos semanticamente próximos;
+
+unidade temática;
+
+objeto de conhecimento;
+
+descrição da habilidade;
+
+conteúdo do bimestre;
+
+componente curricular;
+
+ano ou série.
+A busca inteligente não poderá substituir a validação da matriz original.
+Sempre mostre ao professor:
+
+o conteúdo encontrado;
+
+onde o conteúdo foi encontrado;
+
+a habilidade relacionada;
+
+o código da habilidade, quando existir;
+
+o bimestre;
+
+o componente;
+
+o ano ou série;
+
+o nível de correspondência;
+
+a origem do registro.
+Use níveis de correspondência textuais explicáveis:
+
+correspondência exata;
+
+correspondência alta;
+
+correspondência parcial;
+
+correspondência insuficiente.
+Não apresente um percentual fictício. Use apenas classificações textuais explicáveis.
+Quando houver mais de uma possibilidade válida, apresente as opções ao professor para escolha. Não selecione silenciosamente uma habilidade ambígua.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+27. UTILIZAÇÃO RESPONSÁVEL DO MOTOR DE INTELIGÊNCIA ARTIFICIAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Utilize toda a capacidade tecnicamente disponível do motor de inteligência artificial integrado ao projeto (@google/genai com gemini-2.5-flash) para:
+
+compreender o conteúdo proposto;
+
+localizar correspondências na matriz;
+
+sugerir formatos de atividade;
+
+produzir enunciados claros;
+
+adaptar a complexidade;
+
+organizar elementos visuais e gerar ilustrações SVG pedagógicas específicas para o conteúdo;
+
+gerar alternativas pedagógicas;
+
+propor formas de apoio;
+
+variar questões;
+
+gerar instruções de aplicação;
+
+criar critérios de avaliação;
+
+sugerir recursos acessíveis;
+
+reformular atividades anteriores;
+
+produzir uma atividade coerente com o perfil pedagógico registrado.
+A inteligência artificial deverá trabalhar exclusivamente com dados autorizados e necessários.
+A inteligência artificial não poderá:
+
+inventar habilidades;
+
+inventar códigos curriculares;
+
+produzir diagnósticos;
+
+rotular o estudante;
+
+definir incapacidade;
+
+alterar o PEI automaticamente;
+
+alterar relatórios;
+
+substituir a avaliação profissional;
+
+tomar decisões pedagógicas irreversíveis;
+
+expor dados pessoais;
+
+usar dados de estudantes para treinamento externo;
+
+apresentar conteúdo da internet como se pertencesse à matriz;
+
+copiar atividade protegida integralmente de fonte externa;
+
+enviar informações sensíveis a serviços sem autorização.
+Toda sugestão gerada pela inteligência artificial deverá passar por revisão do professor antes de ser salva como versão definitiva.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+28. GERAÇÃO OU BUSCA DE ATIVIDADES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+No gerador de atividades (ProfessorView.tsx), permita ao professor escolher entre:
+
+gerar uma atividade nova;
+
+reutilizar uma atividade institucional autorizada;
+
+buscar uma atividade no repositório interno;
+
+adaptar uma atividade anterior;
+
+propor atividade com base em modelo autorizado;
+
+recuperar uma atividade já validada para a mesma habilidade;
+
+produzir uma nova versão considerando relatório posterior.
+Se o sistema buscar atividades existentes, priorize:
+
+repositório interno da escola;
+
+atividades produzidas e autorizadas pelos professores;
+
+banco de atividades previamente validado;
+
+modelos institucionais;
+
+materiais cuja utilização esteja autorizada.
+A atividade selecionada ou gerada deverá permanecer alinhada à habilidade e ao conteúdo escolhidos.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+29. INTEGRAÇÃO COM O RELATÓRIO DO PROFISSIONAL DE APOIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Implemente uma integração funcional completa entre:
+
+atividade aplicada;
+
+relatório do profissional de apoio (ProfissionalApoioView.tsx e apoioService.ts);
+
+retorno do professor (ProfessorView.tsx e ProfessorActivityDashboard.tsx);
+
+geração da próxima atividade;
+
+matriz curricular;
+
+histórico pedagógico do estudante.
+O profissional de apoio deverá conseguir associar o relatório à atividade efetivamente aplicada (atividadeAplicadaId).
+O relatório deverá permitir:
+
+selecionar a atividade observada;
+
+informar a data da aplicação;
+
+indicar se a atividade foi iniciada;
+
+indicar se foi concluída;
+
+registrar o nível de ajuda;
+
+registrar as dificuldades observadas;
+
+registrar estratégias utilizadas;
+
+registrar recursos de acessibilidade utilizados;
+
+informar quais partes foram realizadas;
+
+informar quais partes não foram realizadas;
+
+descrever a resposta do estudante;
+
+registrar sugestões para a próxima atividade;
+
+anexar evidências, quando autorizado;
+
+salvar como rascunho (statusRelatorio: 'rascunho');
+
+finalizar o relatório (statusRelatorio: 'finalizado').
+Inclua categorias pedagógicas estruturadas de resultado, sem retirar o campo de descrição livre:
+
+realizou com autonomia;
+
+realizou com apoio leve;
+
+realizou com apoio moderado;
+
+realizou com apoio intenso;
+
+realizou parcialmente;
+
+não iniciou;
+
+não concluiu;
+
+atividade não aplicada;
+
+recusou a proposta;
+
+não foi possível avaliar;
+
+outro resultado, com descrição.
+Não interprete automaticamente “não realizou” como incapacidade.
+O sistema precisa diferenciar (via seleção múltipla estruturada de barreiras):
+
+dificuldade de compreensão;
+
+dificuldade de leitura;
+
+dificuldade de escrita;
+
+dificuldade de atenção;
+
+dificuldade motora;
+
+dificuldade de comunicação;
+
+dificuldade relacionada ao formato;
+
+dificuldade relacionada ao tamanho da atividade;
+
+dificuldade relacionada ao tempo;
+
+dificuldade relacionada à mediação;
+
+ausência de recurso necessário;
+
+atividade não aplicada;
+
+interrupção externa;
+
+informação insuficiente.
+Essas categorias servem para orientar a adaptação e não constituem diagnóstico.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+30. ADAPTAÇÃO DA PRÓXIMA ATIVIDADE APÓS O RELATÓRIO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Conecte efetivamente o adaptacaoService.ts à interface (ProfessorView.tsx e ProfessorActivityDashboard.tsx).
+Quando o relatório do profissional de apoio indicar que o estudante não conseguiu realizar, concluir ou compreender a atividade, o sistema deverá ativar o fluxo “Revisar e adaptar próxima atividade”.
+O sistema não deverá simplesmente repetir a mesma atividade.
+O sistema deverá:
+
+localizar a atividade original;
+
+identificar a matriz vinculada;
+
+manter a mesma habilidade, quando pedagogicamente adequado;
+
+manter o objetivo essencial de aprendizagem;
+
+ler somente os campos autorizados do relatório;
+
+identificar as barreiras relatadas;
+
+verificar as adaptações previstas no PEI;
+
+consultar estratégias anteriores que funcionaram;
+
+sugerir uma versão adaptada;
+
+explicar ao professor o que foi alterado;
+
+apresentar comparação visual lado a lado entre a versão anterior e a nova;
+
+solicitar aprovação do professor (Aceitar, Editar ou Rejeitar);
+
+salvar a nova atividade como outra versão (versao: 2, versao: 3, etc.);
+
+manter o histórico da atividade original;
+
+vincular a nova versão ao relatório que motivou a adaptação.
+Nunca substitua ou apague a atividade anterior.
+Use controle de versões explícito:
+
+Versão 1: atividade original;
+
+Relatório de aplicação da Versão 1;
+
+Versão 2: atividade adaptada após o relatório;
+
+Relatório de aplicação da Versão 2.
+A versão adaptada deverá manter rastreabilidade com: atividade de origem, habilidade, conteúdo, relatório considerado, alterações realizadas, responsável pela aprovação, data e versão.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+31. ESTRATÉGIAS DE ADAPTAÇÃO PEDAGÓGICA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Com base na dificuldade efetivamente registrada, o sistema poderá sugerir e aplicar:
+
+redução da quantidade de itens;
+
+divisão da atividade em etapas;
+
+simplificação da linguagem do enunciado;
+
+frases mais curtas;
+
+destaque das palavras principais;
+
+exemplo resolvido;
+
+instrução acompanhada de imagem;
+
+ampliação de fonte;
+
+maior espaçamento;
+
+aumento da área para resposta;
+
+respostas por marcação;
+
+associação entre colunas;
+
+ligação de elementos;
+
+recorte e colagem;
+
+ordenação de imagens;
+
+uso de pictogramas autorizados;
+
+uso de fotografias;
+
+apoio visual;
+
+apoio concreto ou manipulável;
+
+alternativa de resposta oral;
+
+alternativa de resposta por apontamento;
+
+atividade com desenho;
+
+atividade com letra bastão;
+
+uso de caixa alta;
+
+redução de estímulos visuais;
+
+contraste mais adequado;
+
+uma questão por bloco;
+
+uma questão por página, quando necessário;
+
+ampliação do tempo;
+
+mediação em etapas;
+
+repetição com variação;
+
+retomada de pré-requisitos;
+
+atividade com menor complexidade inicial;
+
+progressão gradual de dificuldade.
+Não aplique todas as adaptações ao mesmo tempo. Escolha apenas as adaptações justificadas pelos registros disponíveis.
+Quando o relatório não apresentar informação suficiente (ex: categoria informação insuficiente ou campos vazios), o sistema deverá informar exatamente:
+“Não há informações suficientes para propor uma adaptação segura. O professor deverá selecionar manualmente as estratégias desejadas.”
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+32. DEFINIÇÃO DO NÍVEL DE DIFICULDADE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Permita ao professor selecionar no gerador:
+
+introdutório;
+
+básico;
+
+intermediário;
+
+avançado;
+
+personalizado.
+O nível deverá alterar o formato e a estrutura cognitiva da atividade gerada, mas não deverá descaracterizar a habilidade escolhida.
+Quando houver dificuldade registrada, o sistema poderá sugerir reduzir temporariamente a complexidade, recuperar pré-requisitos, dividir o objetivo em etapas, usar maior apoio visual, diminuir a quantidade sem eliminar o objetivo central ou manter a habilidade com forma de resposta diferente, explicando a adaptação realizada.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+33. OPÇÃO “ATIVIDADE COM DESENHO”
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Quando o professor marcar a opção “Desenho”, a atividade deverá ser realmente construída para utilizar desenho como recurso pedagógico estruturante, permitindo escolher/combinar:
+
+desenho como resposta (com quadro amplo delimitado na folha A4);
+
+desenho para completar (com contorno simples vetorial nítido para completar);
+
+desenho para representar conceito;
+
+desenho para relacionar/ligar conteúdo;
+
+desenho para colorir com finalidade pedagógica explícita no enunciado;
+
+ilustração associada ao enunciado;
+
+sequência visual / ordenação por etapas;
+
+produção de legenda, quando adequada;
+
+atividade mista com desenho e escrita.
+Regras obrigatórias para “Desenho”:
+
+reservar área suficiente na folha A4;
+
+evitar elementos decorativos excessivos;
+
+usar traços nítidos e bom contraste (legível em impressão colorida e em escala de cinza);
+
+não sobrepor imagem e texto nem cortar imagens na impressão;
+
+utilizar imagens/SVGs coerentes com o conteúdo da matriz;
+
+fornecer texto alternativo (alt / descrição acessível) na versão digital.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+34. OPÇÃO “LETRA BASTÃO”
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Quando o professor marcar a opção “Letra bastão”, todo o conteúdo destinado ao estudante deverá ser apresentado em letra bastão, em CAIXA ALTA:
+
+título da atividade;
+
+nome dos campos do estudante;
+
+enunciados;
+
+alternativas;
+
+palavras de apoio;
+
+legendas;
+
+instruções;
+
+textos de leitura;
+
+comandos;
+
+caixas de resposta;
+
+exemplos.
+ATENÇÃO — NÃO converta para caixa alta:
+
+códigos oficiais das habilidades (ex: EF07LP01, EF69LP05 devem manter sua grafia oficial exata);
+
+endereços eletrônicos (e-mails e URLs);
+
+nomes técnicos cuja alteração prejudique a identificação (ex: símbolos químicos ou unidades métricas como km, mL, kg);
+
+referências bibliográficas;
+
+metadados administrativos que não sejam destinados ao estudante.
+Utilize fonte sem serifa, simples e legível (Arial, Verdana, Lexend ou Atkinson Hyperlegible), sem itálico nos blocos destinados ao estudante, com espaçamento confortável e alto contraste.
+Quando “Desenho” e “Letra bastão” forem selecionados simultaneamente, combine texto em caixa alta, enunciados curtos, ilustrações funcionais e espaço amplo para resposta sem sobreposição.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+35. OPÇÕES DO GERADOR DE ATIVIDADES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Inclua e conecte funcionalmente todas as seguintes opções no gerador (ProfessorView.tsx), garantindo que cada opção altere de verdade o documento gerado:
+
+IDENTIFICAÇÃO PEDAGÓGICA: estudante, turma, ano/série, componente curricular, bimestre, unidade temática, objeto de conhecimento, conteúdo, habilidade, objetivo da aula.
+
+FORMATO: atividade individual, atividade para a turma, atividade adaptada, atividade diagnóstica, retomada, consolidação, avaliação, tarefa, atividade prática, atividade lúdica.
+
+APRESENTAÇÃO: letra bastão, caixa alta, desenho, imagens, pictogramas autorizados, fonte ampliada (normal, ampliada 16pt, extra ampliada 20pt), alto contraste, poucas informações por bloco, espaço ampliado para resposta, uma questão por bloco, uma questão por página (page-break-after: always), versão colorida, versão em escala de cinza (grayscale).
+
+TIPOS DE QUESTÃO: múltipla escolha, verdadeiro ou falso, associação, completar, ligar, ordenar, resposta curta, resposta por desenho, recorte e colagem, atividade prática, produção oral, produção escrita, atividade mista.
+
+CONFIGURAÇÃO: quantidade de questões, nível de dificuldade, tamanho da fonte, quantidade de páginas, orientação (retrato ou paisagem), cabeçalho, rodapé, numeração, identificação do estudante, espaço para data, espaço para nome, espaço para mediação, gabarito, orientações ao professor, orientações ao profissional de apoio.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+36. SEPARAÇÃO ENTRE MATERIAL DO ESTUDANTE E ORIENTAÇÕES PROFISSIONAIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Gere e permita visualizar/imprimir/baixar três blocos separados:
+
+BLOCO 1 — ATIVIDADE DO ESTUDANTE: linguagem adequada, conteúdo, identificação, questões, espaços para resposta e elementos visuais, sem notas internas, sem diagnósticos/CID expostos, sem informações sensíveis e sem justificativas técnicas.
+
+BLOCO 2 — ORIENTAÇÕES AO PROFESSOR: habilidade trabalhada, objetivo, conteúdo, justificativa pedagógica, adaptações realizadas, forma de aplicação, critérios de avaliação processual, gabarito completo e possíveis intervenções.
+
+BLOCO 3 — ORIENTAÇÕES AO PROFISSIONAL DE APOIO: como apresentar a atividade, tipo de apoio permitido, material necessário, sinais a observar, campos para registro em sala, cuidados para não fornecer a resposta pronta, orientação para registrar o nível de ajuda e referência à atividade/versão.
+As orientações profissionais não deverão aparecer na folha do estudante, salvo quando o professor escolher expressamente exportar a versão conjunta (em páginas separadas após a folha do estudante).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+37, 38, 39 E 40. FORMATAÇÃO A4, PRÉ-VISUALIZAÇÃO FIEL, PDF VÁLIDO E GABARITO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Formatação A4 (index.css, A4SheetPreview.tsx, atividadeA4PdfService.ts):
+
+Tamanho 210 mm × 297 mm (Retrato) ou 297 mm × 210 mm (Paisagem);
+
+Margens seguras de 15mm (@page { size: A4 portrait; margin: 15mm; } e suporte dinâmico a landscape);
+
+Durante a impressão (@media print), ocultar menus, botões, barras laterais, controles de edição e alertas técnicos, impedindo quebra de página dentro de questões (break-inside: avoid; page-break-inside: avoid;).
+
+Pré-visualização A4 (A4SheetPreview.tsx):
+
+Mostrar proporção real da folha A4, indicadores de quebra de página, alertas caso haja conteúdo fora da área imprimível ou imagem de baixa resolução, seletor de Zoom (75%, 100%, 125%), navegação entre páginas/blocos (Folha do Estudante / Guia do Professor & Gabarito / Guia do Apoio) e alternância Retrato/Paisagem.
+
+Incluir na barra de ferramentas da visualização A4 todos os comandos: Visualizar, Editar, Gerar novamente, Aprovar, Salvar rascunho, Baixar PDF, Imprimir, Duplicar, Criar versão adaptada, Cancelar.
+
+Geração e Download em PDF (atividadeA4PdfService.ts):
+
+Garantir que “Baixar PDF” gere um arquivo PDF real, nítido, completo (incluindo os desenhos SVG renderizados em canvas/PNG de alta resolução no jsPDF) e pronto para impressão, e o envie também para a pasta da série no Google Drive se conectado.
+
+Padrão obrigatório de nome do arquivo sanitizado (sem diagnósticos ou dados sensíveis):
+
+ATIVIDADE_[COMPONENTE]_[ESTUDANTE]_[DATA]_[VERSAO].pdf (quando individual e autorizado) ou
+
+ATIVIDADE_[COMPONENTE]_[TURMA]_[DATA]_[VERSAO].pdf.
+
+Gabarito e Critérios de Avaliação Processual:
+
+O gabarito deve corresponder exatamente às questões da versão gerada, incluir respostas alternativas aceitáveis e critérios para questões abertas/adaptadas (considerando objetivo essencial, forma de participação, nível de autonomia, uso de recursos, compreensão demonstrada e progresso em relação às atividades anteriores).
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+41, 42, 44 E 45. HISTÓRICO, NOTIFICAÇÕES INTERNAS, PROTEÇÃO DE DADOS E VALIDAÇÕES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Status Oficiais e Rastreabilidade (types/index.ts e App.tsx):
+
+Suportar todos os status de ciclo de vida da atividade: rascunho, aguardando revisão, aprovada, aplicada, relatório pendente, relatório concluído, adaptação sugerida, nova versão em elaboração, arquivada (mantendo compatibilidade retroativa com 'Gerada' e 'Revisada').
+
+Registrar no histórico quem gerou, editou, aprovou, data/hora, matriz, habilidade, conteúdo, estudante/turma, opções selecionadas, versão, relatório utilizado na adaptação, alterações entre versões e datas de download/impressão.
+
+Notificações Internas entre Professor e Profissional de Apoio (src/services/notificacoesPedagogicasService.ts + Badge/Painel no Header.tsx, ProfessorView.tsx e ProfissionalApoioView.tsx):
+
+Disparar e sincronizar no Firestore (notifications) e /api/sync-state notificações reais com estado lida/não lida e opção de arquivar:
+
+“Uma nova atividade foi disponibilizada para aplicação.” (quando o professor aprova uma atividade);
+
+“O profissional de apoio concluiu o relatório da atividade.” (quando o PAE finaliza o registro vinculado);
+
+“O relatório indica necessidade de revisão da atividade.” (quando há barreira/não realização);
+
+“Uma nova versão adaptada foi sugerida.”;
+
+“O professor aprovou a atividade adaptada.”;
+
+“A atividade está aguardando relatório de aplicação.”.
+
+Ao clicar na notificação, abrir diretamente o registro/atividade correspondente respeitando as permissões do perfil.
+
+Proteção de Dados nos Relatórios e Validações Antes de Gerar/Salvar:
+
+Garantir que apenas usuários autorizados vejam relatórios restritos, que o texto integral do relatório ou laudo/CID nunca vaze para a Folha do Estudante (Bloco 1), e que antes de gerar ou salvar o sistema valide ausência de campos undefined, códigos fictícios ou sobreposições.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+46 A 51. TESTES AUTOMATIZADOS, CRITÉRIOS DE ACEITAÇÃO E RELATÓRIO FINAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Execute as melhorias na ordem das Fases 1 a 8 (Preservação -> Matriz -> Gerador com IA -> Relatórios e Sincronização em Rede/Drive -> Adaptação Versionada -> Documento A4/PDF -> Testes -> Entrega).
+
+Atualize/adicione testes em src/server/__tests__/ cobrindo busca na matriz, geração com letra bastão (preservando códigos BNCC/DC-GO), atividade com desenho, fluxo de adaptação pós-relatório do PAE sem apagar a versão original, e sincronização em rede.
+
+Garanta que npm run lint (tsc --noEmit) e npm run build compilem com ZERO ERROS.
+
+Ao finalizar as alterações nos arquivos, apresente o relatório técnico contendo a seção obrigatória 

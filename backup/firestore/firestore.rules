@@ -2,12 +2,17 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ==========================================
-    // FUNÇÕES DE SEGURANÇA E CONTROLE DE ACESSO
-    // ==========================================
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
 
-    function isAuthenticated() {
-      return request.auth != null;
+    // -------------------------------------------------------------------------
+    // HELPERS
+    // -------------------------------------------------------------------------
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     function incoming() {
@@ -18,197 +23,158 @@ service cloud.firestore {
       return resource.data;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() > 0 && id.size() <= 128;
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Administrador Master ou e-mail institucional homologado
+    // Master Admins
     function isSuperAdmin() {
-      return isAuthenticated() && (
-        (request.auth.token.email != null && (
-          request.auth.token.email.lower() == 'marcosjeovagire@gmail.com' ||
-          request.auth.token.email.lower() == 'marcos.ferreira@admin.educa.go.gov.br'
-        )) ||
-        (request.auth.token.keys().hasAny(['admin', 'superadmin']) && 
-         (request.auth.token.admin == true || request.auth.token.superadmin == true))
+      return isSignedIn() && (
+        request.auth.token.email == 'marcosjeovagire@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
 
-    // Documento de usuário na coleção authorizedUsers
+    // RBAC Lookup
     function hasUserDoc() {
-      return isAuthenticated() && exists(/databases/$(database)/documents/authorizedUsers/$(request.auth.uid));
+      return exists(/databases/$(database)/documents/authorizedUsers/$(request.auth.uid));
     }
 
-    function getUserDoc() {
-      return get(/databases/$(database)/documents/authorizedUsers/$(request.auth.uid));
+    function getUserData() {
+      return get(/databases/$(database)/documents/authorizedUsers/$(request.auth.uid)).data;
     }
 
-    function isAuthorizedUser() {
-      return isSuperAdmin() || (
-        isAuthenticated() && (
-          !hasUserDoc() ||
-          getUserDoc().data.active != false
-        )
-      );
+    function hasInternalRole(role) {
+      return hasUserDoc() && role in getUserData().roles;
     }
 
-    function hasCoordinatorRole() {
-      return isSuperAdmin() || (
-        hasUserDoc() && (
-          'coordinator' in getUserDoc().data.roles ||
-          'coordenador' in getUserDoc().data.roles ||
-          'GESTOR' in getUserDoc().data.roles ||
-          'superadmin' in getUserDoc().data.roles
-        )
-      );
+    function isInternalCoordinator() { 
+      return hasInternalRole('coordinator') || hasInternalRole('coordenador') || hasInternalRole('GESTOR') || hasInternalRole('superadmin'); 
+    }
+    
+    function isInternalTeacher() { 
+      return isInternalCoordinator() || hasInternalRole('teacher') || hasInternalRole('professor') || hasInternalRole('PROFESSOR'); 
+    }
+    
+    function isInternalSupport() { 
+      return isInternalCoordinator() || hasInternalRole('support') || hasInternalRole('apoio') || hasInternalRole('PROFISSIONAL_DE_APOIO'); 
     }
 
-    function hasTeacherRole() {
-      return hasCoordinatorRole() || (
-        hasUserDoc() && (
-          'teacher' in getUserDoc().data.roles ||
-          'professor' in getUserDoc().data.roles ||
-          'PROFESSOR' in getUserDoc().data.roles
-        )
-      );
+    // Public Helpers
+    function isCoordinator() { return isSuperAdmin() || isInternalCoordinator(); }
+    function isTeacher() { return isSuperAdmin() || isInternalTeacher(); }
+    function isSupport() { return isSuperAdmin() || isInternalSupport(); }
+
+    // -------------------------------------------------------------------------
+    // ENTITY VALIDATORS
+    // -------------------------------------------------------------------------
+
+    function isValidAuthorizedUser(data) {
+      return data.keys().hasAll(['id', 'email', 'roles']) &&
+             data.keys().hasOnly(['id', 'uid', 'name', 'nome', 'email', 'emailNormalized', 'roles', 'active', 'status', 'schoolId', 'allowedClasses', 'allowedDisciplines', 'createdAt', 'updatedAt']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.email is string && data.email.size() <= 256 &&
+             data.roles is list && data.roles.size() <= 10;
     }
 
-    function hasSupportRole() {
-      return hasCoordinatorRole() || (
-        hasUserDoc() && (
-          'PROFISSIONAL_DE_APOIO' in getUserDoc().data.roles ||
-          'support' in getUserDoc().data.roles ||
-          'apoio' in getUserDoc().data.roles
-        )
-      );
+    function isValidEstudante(data) {
+      return data.keys().hasAll(['id', 'nome', 'turma', 'schoolId']) &&
+             data.keys().hasOnly(['id', 'nome', 'matricula', 'turma', 'anoSerie', 'turno', 'situacao', 'laudo', 'schoolId', 'updatedAt', 'fotoUrl', 'necessidadesEspeciais', 'professorId']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.nome is string && data.nome.size() <= 200 &&
+             data.turma is string && data.turma.size() <= 50 &&
+             data.schoolId is string && data.schoolId.size() <= 128;
     }
 
-    // ==========================================
-    // REGRAS DAS COLEÇÕES INSTITUCIONAIS
-    // ==========================================
+    function isValidPei(data) {
+      return data.keys().hasAll(['id', 'studentId', 'schoolId']) &&
+             data.keys().hasOnly(['id', 'studentId', 'studentName', 'diagnosis', 'status', 'updatedAt', 'schoolId', 'historicoAlteracoes', 'periodo']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.studentId is string && data.studentId.size() <= 128;
+    }
 
-    // 1. Usuários Autorizados (authorizedUsers)
+    function isValidActivity(data) {
+      return data.keys().hasAll(['id', 'estudanteId', 'schoolId']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.estudanteId is string && data.estudanteId.size() <= 128;
+    }
+
+    function isValidSupportRecord(data) {
+      return data.keys().hasAll(['id', 'studentId', 'data', 'schoolId']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.studentId is string && data.studentId.size() <= 128;
+    }
+
+    // -------------------------------------------------------------------------
+    // COLLECTION MATCHES
+    // -------------------------------------------------------------------------
+
+    // 1. Authorized Users
     match /authorizedUsers/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isSuperAdmin() || hasCoordinatorRole() || (isAuthenticated() && request.auth.uid == userId);
-      allow update: if isSuperAdmin() || hasCoordinatorRole() || (isAuthenticated() && request.auth.uid == userId);
+      allow read: if isSignedIn();
+      allow create: if (isCoordinator() || (request.auth.uid == userId)) && isValidId(userId) && isValidAuthorizedUser(incoming());
+      allow update: if (isCoordinator() || (request.auth.uid == userId)) && 
+                     isValidAuthorizedUser(incoming()) &&
+                     (isCoordinator() || incoming().roles == existing().roles);
       allow delete: if isSuperAdmin();
     }
 
-    // 2. Estudantes da Educação Especial (students) - Apenas perfis pedagógicos autorizados
+    // 2. Students
     match /students/{studentId} {
-      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
-      allow create, update: if hasTeacherRole() || hasCoordinatorRole() || isSuperAdmin();
-      allow delete: if hasCoordinatorRole() || isSuperAdmin();
+      allow list: if isSuperAdmin() || (isInternalTeacher() && resource.data.schoolId == getUserData().schoolId) || (isInternalSupport() && resource.data.schoolId == getUserData().schoolId);
+      allow get: if isSuperAdmin() || (isInternalTeacher() && resource.data.schoolId == getUserData().schoolId) || (isInternalSupport() && resource.data.schoolId == getUserData().schoolId);
+      allow create: if isTeacher() && isValidId(studentId) && isValidEstudante(incoming()) && (isSuperAdmin() || incoming().schoolId == getUserData().schoolId);
+      allow update: if isTeacher() && isValidEstudante(incoming()) && (isSuperAdmin() || (incoming().schoolId == getUserData().schoolId && existing().schoolId == getUserData().schoolId));
+      allow delete: if isCoordinator() && (isSuperAdmin() || existing().schoolId == getUserData().schoolId);
     }
 
-    // 3. Perfis Pedagógicos
+    // 3. PEI Documents
+    match /peis/{peiId} {
+      allow list: if isSuperAdmin() || (isInternalTeacher() && resource.data.schoolId == getUserData().schoolId) || (isInternalSupport() && resource.data.schoolId == getUserData().schoolId);
+      allow get: if isSuperAdmin() || (isInternalTeacher() && resource.data.schoolId == getUserData().schoolId) || (isInternalSupport() && resource.data.schoolId == getUserData().schoolId);
+      allow create: if isTeacher() && isValidId(peiId) && isValidPei(incoming()) && (isSuperAdmin() || get(/databases/$(database)/documents/students/$(incoming().studentId)).data.schoolId == getUserData().schoolId);
+      allow update: if isTeacher() && isValidPei(incoming()) && (isSuperAdmin() || (existing().schoolId == getUserData().schoolId && (existing().status != 'homologado' || isInternalCoordinator())));
+      allow delete: if isCoordinator() && (isSuperAdmin() || existing().schoolId == getUserData().schoolId);
+    }
+
+    // 4. Activities
+    match /activities/{activityId} {
+      allow list: if isSuperAdmin() || (isInternalTeacher() && resource.data.schoolId == getUserData().schoolId) || (isInternalSupport() && resource.data.schoolId == getUserData().schoolId);
+      allow get: if isSuperAdmin() || (isInternalTeacher() && resource.data.schoolId == getUserData().schoolId) || (isInternalSupport() && resource.data.schoolId == getUserData().schoolId);
+      allow create: if isTeacher() && isValidId(activityId) && isValidActivity(incoming()) && (isSuperAdmin() || get(/databases/$(database)/documents/students/$(incoming().estudanteId)).data.schoolId == getUserData().schoolId);
+      allow update: if isTeacher() && isValidActivity(incoming()) && (isSuperAdmin() || existing().schoolId == getUserData().schoolId);
+      allow delete: if isCoordinator() && (isSuperAdmin() || existing().schoolId == getUserData().schoolId);
+    }
+
+    // 5. Support Records
+    match /supportRecords/{recordId} {
+      allow list: if isSuperAdmin() || (isInternalTeacher() && resource.data.schoolId == getUserData().schoolId) || (isInternalSupport() && resource.data.schoolId == getUserData().schoolId);
+      allow get: if isSuperAdmin() || (isInternalTeacher() && resource.data.schoolId == getUserData().schoolId) || (isInternalSupport() && resource.data.schoolId == getUserData().schoolId);
+      allow create: if isSupport() && isValidId(recordId) && isValidSupportRecord(incoming()) && (isSuperAdmin() || get(/databases/$(database)/documents/students/$(incoming().studentId)).data.schoolId == getUserData().schoolId);
+      allow update: if isSupport() && isValidSupportRecord(incoming()) && (isSuperAdmin() || existing().schoolId == getUserData().schoolId);
+      allow delete: if isCoordinator() && (isSuperAdmin() || existing().schoolId == getUserData().schoolId);
+    }
+
+    // 6. Schools
+    match /schools/{schoolId} {
+      allow read: if isSignedIn();
+      allow create: if isSuperAdmin() && isValidId(schoolId);
+      allow update: if isCoordinator() && (isSuperAdmin() || schoolId == getUserData().schoolId);
+      allow delete: if isSuperAdmin();
+    }
+
     match /pedagogicalProfiles/{profileId} {
-      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
-      allow write: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
-    }
-
-    // 4. Habilidades e Matrizes Curriculares (skills / curriculumMatrices)
-    match /skills/{skillId} {
-      allow read: if isAuthenticated();
-      allow write: if hasCoordinatorRole() || isSuperAdmin();
+      allow read, write: if isTeacher();
     }
 
     match /curriculumMatrices/{matrixId} {
-      allow read: if isAuthenticated();
-      allow write: if hasCoordinatorRole() || isSuperAdmin();
-    }
-
-    match /curriculumSkills/{skillId} {
-      allow read: if isAuthenticated();
-      allow write: if hasCoordinatorRole() || isSuperAdmin();
-    }
-
-    match /curriculumDocuments/{docId} {
-      allow read: if isAuthenticated();
-      allow write: if hasCoordinatorRole() || isSuperAdmin();
-    }
-
-    // 5. Atividades Adaptadas (activities)
-    match /activities/{activityId} {
-      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
-      allow create: if hasTeacherRole() || hasCoordinatorRole() || isSuperAdmin();
-      allow update: if hasCoordinatorRole() || isSuperAdmin() || (
-        hasTeacherRole() && (
-          !('professorId' in resource.data) ||
-          resource.data.professorId == request.auth.uid
-        )
-      );
-      allow delete: if hasCoordinatorRole() || isSuperAdmin() || (
-        hasTeacherRole() && (
-          !('professorId' in resource.data) ||
-          resource.data.professorId == request.auth.uid
-        )
-      );
-    }
-
-    // 6. Registros do Profissional de Apoio Escolar (supportRecords / supportLogs)
-    match /supportRecords/{recordId} {
-      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
-      allow create, update: if hasSupportRole() || hasCoordinatorRole() || isSuperAdmin();
-      allow delete: if hasCoordinatorRole() || isSuperAdmin();
-    }
-
-    match /supportLogs/{logId} {
-      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
-      allow create, update: if hasSupportRole() || hasCoordinatorRole() || isSuperAdmin();
-      allow delete: if hasCoordinatorRole() || isSuperAdmin();
-    }
-
-    // 7. Planos Educacionais Individualizados (PEI) e Relatórios
-    match /peis/{peiId} {
-      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
-      allow write: if hasCoordinatorRole() || hasTeacherRole() || hasSupportRole() || isSuperAdmin();
-    }
-
-    match /peiDocuments/{peiId} {
-      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
-      allow write: if hasCoordinatorRole() || hasTeacherRole() || hasSupportRole() || isSuperAdmin();
-    }
-
-    match /bimonthlyReports/{reportId} {
-      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
-      allow write: if hasCoordinatorRole() || hasTeacherRole() || hasSupportRole() || isSuperAdmin();
-    }
-
-    match /reports/{reportId} {
-      allow read: if hasTeacherRole() || hasCoordinatorRole() || hasSupportRole() || isSuperAdmin();
-      allow write: if hasCoordinatorRole() || hasTeacherRole() || hasSupportRole() || isSuperAdmin();
-    }
-
-    // 8. Configurações da Unidade Escolar (schools)
-    match /schools/{schoolId} {
-      allow read: if isAuthenticated();
-      allow write: if hasCoordinatorRole() || isSuperAdmin();
-    }
-
-    // 9. Metadados de Sincronização e Auditoria
-    match /syncMeta/{metaId} {
-      allow read, write: if isAuthenticated();
+      allow read: if isSignedIn();
+      allow write: if isCoordinator();
     }
 
     match /auditLogs/{logId} {
-      allow read: if hasCoordinatorRole() || isSuperAdmin();
-      allow create: if isAuthenticated();
-      allow update, delete: if false; // Imutabilidade estrita da trilha de auditoria
-    }
-
-    match /driveFiles/{fileId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    match /importBatches/{batchId} {
-      allow read, write: if hasCoordinatorRole() || isSuperAdmin();
-    }
-
-    match /documents/{docId} {
-      allow read: if isAuthenticated();
-      allow write: if hasCoordinatorRole() || isSuperAdmin();
+      allow read: if isCoordinator();
+      allow create: if isSignedIn();
     }
   }
 }

@@ -2,7 +2,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import compression from 'vite-plugin-compression';
 import path from 'node:path';
-import { defineConfig, loadEnv, Plugin } from 'vite';
+import { defineConfig, Plugin } from 'vite';
 
 function healthCheckPlugin(): Plugin {
   let sharedLanState: any = {};
@@ -14,10 +14,6 @@ function healthCheckPlugin(): Plugin {
       JSON.stringify({
         status: 'ok',
         timestamp: new Date().toISOString(),
-        school: 'Colégio Estadual Olynto Pereira de Castro',
-        environment: process.env.NODE_ENV || 'development',
-        geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
-        geminiModel: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
       })
     );
   };
@@ -112,48 +108,7 @@ function healthCheckPlugin(): Plugin {
   };
 }
 
-function normalizeHost(input?: string): string {
-  if (!input) return '';
-  let str = input.trim();
-  if (str.startsWith('http://') || str.startsWith('https://')) {
-    try {
-      return new URL(str).hostname;
-    } catch {
-      str = str.replace(/^https?:\/\//, '');
-    }
-  }
-  // Strip port if present
-  str = str.split(':')[0];
-  // Strip path or trailing slash if present
-  str = str.split('/')[0];
-  return str.trim();
-}
-
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
-  const internalPort = 3000;
-
-  const rawPublicHost =
-    env.APP_URL ||
-    process.env.APP_URL ||
-    env.VITE_PUBLIC_HOST ||
-    '';
-  const extractedHost = normalizeHost(rawPublicHost);
-  const isLocal =
-    !extractedHost ||
-    extractedHost === 'localhost' ||
-    extractedHost === '127.0.0.1' ||
-    extractedHost === '::1';
-  const publicHost = isLocal ? '' : extractedHost;
-
-  const publicProtocol = publicHost ? 'wss' : 'ws';
-  const publicClientPort = publicHost ? 443 : internalPort;
-
-  // Diretório de saída absoluto e explicitamente resolvido para garantir que
-  // vite-plugin-compression e o build do Vite gerem os arquivos .gz em dist/assets/
-  // evitando qualquer erro de concatenação como 'dist//app/applet/assets/'
-  const outDir = path.resolve(import.meta.dirname, 'dist');
-
+export default defineConfig(() => {
   return {
     plugins: [
       react(),
@@ -164,7 +119,6 @@ export default defineConfig(({ mode }) => {
         ext: '.gz',
         threshold: 10240, // Comprime arquivos maiores que 10KB
         deleteOriginFile: false,
-        ...({ outDir }),
       }),
     ],
     resolve: {
@@ -173,8 +127,6 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      outDir,
-      emptyOutDir: true,
       target: 'esnext',
       chunkSizeWarningLimit: 1000,
       rolldownOptions: {
@@ -182,18 +134,8 @@ export default defineConfig(({ mode }) => {
           codeSplitting: {
             groups: [
               {
-                name: 'vendor-firebase-firestore',
-                test: /[\\/]node_modules[\\/](@firebase[\\/]firestore|firebase[\\/]firestore)[\\/]/,
-                priority: 35,
-              },
-              {
-                name: 'vendor-firebase-auth',
-                test: /[\\/]node_modules[\\/](@firebase[\\/]auth|firebase[\\/]auth)[\\/]/,
-                priority: 34,
-              },
-              {
-                name: 'vendor-firebase-core',
-                test: /[\\/]node_modules[\\/](@firebase|firebase)[\\/]/,
+                name: 'vendor-firebase',
+                test: /[\\/]node_modules[\\/](firebase|@firebase)[\\/]/,
                 priority: 30,
               },
               {
@@ -249,14 +191,8 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks(id) {
             if (id.includes('node_modules')) {
-              if (id.includes('@firebase/firestore') || id.includes('firebase/firestore')) {
-                return 'vendor-firebase-firestore';
-              }
-              if (id.includes('@firebase/auth') || id.includes('firebase/auth')) {
-                return 'vendor-firebase-auth';
-              }
               if (id.includes('firebase') || id.includes('@firebase')) {
-                return 'vendor-firebase-core';
+                return 'vendor-firebase';
               }
               if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('canvg')) {
                 return 'vendor-pdf';
@@ -311,20 +247,8 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       host: '0.0.0.0',
-      strictPort: true,
       allowedHosts: true,
-      hmr: {
-        overlay: true,
-      },
-      ...(publicHost
-        ? {
-            ws: {
-              protocol: publicProtocol,
-              host: publicHost,
-              clientPort: publicClientPort,
-            },
-          }
-        : {}),
+      hmr: false,
       watch: {
         ignored: ['**/node_modules/**', '**/.git/**'],
       },
